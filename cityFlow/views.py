@@ -1,6 +1,10 @@
 from rest_framework import viewsets, filters
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status as http_status
 from django_filters.rest_framework import DjangoFilterBackend
+
 from .models import (
     User, UserProfile, District, WeatherRecord,
     WaterConsumption, WaterPrediction,
@@ -8,17 +12,6 @@ from .models import (
     TourismPressure, Tag, IncidentReport, Alert,
 )
 from .serializers import *
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework import status as http_status
-
-from .models import District
-from .serializers import (
-    AirPredictionRequestSerializer,
-    AirPredictionSerializer,
-    WaterAnomalyRequestSerializer,
-    WaterPredictionSerializer,
-)
 from .services.air_prediction import predict_air_quality, train_all_districts
 from .services.water_anomalies import analyze_district, analyze_all_districts
 
@@ -100,8 +93,14 @@ class PredictionViewSet(viewsets.ViewSet):
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by("id")
+
     def get_serializer_class(self):
         return UserCreateSerializer if self.action == "create" else UserSerializer
+
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
+    def me(self, request):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
 
 
 class UserProfileViewSet(viewsets.ModelViewSet):
