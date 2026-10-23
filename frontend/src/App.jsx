@@ -4,6 +4,7 @@ import { Navbar } from './components/Navbar';
 import { HeroCarousel } from './components/HeroCarousel';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { Dashboard } from './views/Dashboard'; 
 
 function App() {
   return (
@@ -18,7 +19,7 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route 
                 path="/dashboard" 
-                element={<div className="text-center text-slate-400 py-12">Panel de Monitoreo Urbano (Próximamente)</div>} 
+                element={<Dashboard />} 
               />
             </Routes>
           </main>
