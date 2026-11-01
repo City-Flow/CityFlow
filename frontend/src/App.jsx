@@ -5,6 +5,7 @@ import { HeroCarousel } from './components/HeroCarousel';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { Dashboard } from './views/Dashboard'; 
+import { UserProfilePage } from './pages/UserProfilePage';
 
 function App() {
   return (
@@ -20,7 +21,9 @@ function App() {
               <Route 
                 path="/dashboard" 
                 element={<Dashboard />} 
+                
               />
+              <Route path="/account" element={<UserProfilePage />} />
             </Routes>
           </main>
         </div>
