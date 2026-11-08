@@ -1,7 +1,8 @@
+// src/components/IntegratedTab.jsx
 import { useState } from "react";
+import { CityMap } from "./CityMap";
 
 export function IntegratedTab() {
-  // Datos correlacionados por distrito (Turismo + Agua + Aire)
   const [integratedData] = useState([
     { id: 1, name: "Ciutat Vella", tourismPressure: "Muy Alta (92%)", waterAnomaly: "+24.5% (Crítico)", airQuality: "Deficiente (NO2 alto)", riskLevel: "Crítico" },
     { id: 2, name: "Eixample", tourismPressure: "Alta (88%)", waterAnomaly: "+15.2% (Alerta)", airQuality: "Moderado (NO2 medio)", riskLevel: "Alto" },
@@ -10,14 +11,12 @@ export function IntegratedTab() {
     { id: 5, name: "Sants-Montjuïc", tourismPressure: "Media (70%)", waterAnomaly: "-2.0% (Normal)", airQuality: "Buena", riskLevel: "Bajo" },
   ]);
 
-  const [simulationScenario, setSimulationScenario] = useState("evento_masivo"); // 'evento_masivo' o 'restriccion_trafico'
+  const [simulationScenario, setSimulationScenario] = useState("evento_masivo");
 
   return (
     <>
-      {/* Izquierda: Mapa de Calor e Interrelación Multivariable (8/12) */}
       <div className="lg:col-span-8 flex flex-col gap-4">
         
-        {/* Banner Explicativo de la Matriz de Decisión */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col gap-1">
           <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
@@ -28,7 +27,16 @@ export function IntegratedTab() {
           </p>
         </div>
 
-        {/* Tabla / Matriz de Calor Integrada */}
+        <div className="h-90 w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-2 relative">
+          <CityMap
+            mode="integrated"
+            districts={integratedData}
+            onSelectDistrict={(id) => {
+              console.log("Distrito seleccionado:", id);
+            }}
+          />
+        </div>
+
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex-1 overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -66,21 +74,10 @@ export function IntegratedTab() {
           </table>
         </div>
 
-        {/* Gráfico de Tendencia Cruzada (Placeholder de alto impacto visual) */}
-        <div className="h-50 w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center relative overflow-hidden">
-          <span className="text-2xl mb-1">📈📉</span>
-          <h4 className="text-xs font-bold text-slate-200">Evolución Temporal Cruzada (Turismo vs. Agua vs. Emisiones)</h4>
-          <p className="text-[11px] text-slate-500 mt-1 max-w-md">
-            Gráfico de triple eje sincronizado con la franja horaria seleccionada en el panel superior.
-          </p>
-        </div>
-
       </div>
 
-      {/* Derecha: Panel de Escenarios Estratégicos y Políticas (4/12) */}
       <div className="lg:col-span-4 flex flex-col gap-4">
         
-        {/* Selector de Escenarios de Gestión */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md space-y-3">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
             Simulador de Escenarios Urbanos
@@ -116,7 +113,6 @@ export function IntegratedTab() {
           </div>
         </div>
 
-        {/* Recomendaciones Automatizadas por IA */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex-1 flex flex-col justify-between space-y-3">
           <div>
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">

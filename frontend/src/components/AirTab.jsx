@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AirMapView } from "./AirMapView";
+import { CityMap } from "./CityMap";
 import { AirChart } from "./AirChart";
 import api from "../services/api";
 
@@ -49,10 +49,7 @@ export function AirTab() {
       {/* Izquierda: Mapa de Aire & Gráfico (8/12) */}
       <div className="lg:col-span-8 flex flex-col gap-4">
         <div className="h-105 w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-2 relative">
-          <AirMapView
-            districts={airDistricts}
-            onSelectDistrict={handleSelectAir}
-          />
+          <CityMap mode="air" districts={airDistricts} onSelectDistrict={handleSelectAir} />
         </div>
         <div className="h-65 w-full">
           <AirChart data={selectedAirData} />
