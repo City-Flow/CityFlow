@@ -53,7 +53,7 @@ export function Dashboard() {
       {/* HEADER CON PESTAÑAS */}
       <header className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
         <div className="flex items-center gap-6">
-          <span className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+          <span className="text-xl font-bold bg-linear-to-tr from-cyan-400 to-blue-500 bg-clip-text text-transparent">
             Monitor Urbano
           </span>
 
@@ -96,13 +96,13 @@ export function Dashboard() {
         {activeTab === "water" && (
           <>
             <div className="lg:col-span-7 flex flex-col gap-4">
-              <div className="h-[450px] w-full">
+              <div className="h-112.5 w-full">
                 <MapView
                   districts={waterDistricts}
                   onSelectDistrict={handleSelectWater}
                 />
               </div>
-              <div className="h-[280px] w-full">
+              <div className="h-70 w-full">
                 <WaterChart data={selectedWaterData} />
               </div>
             </div>
@@ -148,13 +148,13 @@ export function Dashboard() {
         {activeTab === "air" && (
           <>
             <div className="lg:col-span-7 flex flex-col gap-4">
-              <div className="h-[450px] w-full">
+              <div className="h-112.5 w-full">
                 <AirMapView
                   districts={airDistricts}
                   onSelectDistrict={handleSelectAir}
                 />
               </div>
-              <div className="h-[280px] w-full">
+              <div className="h-70 w-full">
                 <AirChart data={selectedAirData} />
               </div>
             </div>

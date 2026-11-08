@@ -188,10 +188,21 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return UserCreateSerializer if self.action == "create" else UserSerializer
 
-    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=["get", "put", "patch", "delete"], permission_classes=[IsAuthenticated])
     def me(self, request):
-        serializer = self.get_serializer(request.user)
-        return Response(serializer.data)
+        if request.method == "GET":
+          serializer = self.get_serializer(request.user)
+          return Response(serializer.data)
+        elif request.method in ["PUT", "PATCH"]:
+            partial = request.method == "PATCH"
+            serializer = self.get_serializer(request.user, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+        elif request.method == "DELETE":
+            request.user.delete()
+            return Response(status=http_status.HTTP_204_NO_CONTENT)
+
 
 
 class UserProfileViewSet(viewsets.ModelViewSet):
