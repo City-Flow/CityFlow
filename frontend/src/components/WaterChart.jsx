@@ -21,7 +21,7 @@ export function WaterChart({ data }) {
         Consumo de Agua: <span className="text-cyan-400">{data.district_name}</span>
       </h3>
       
-      <div className="flex-1 w-full min-h-[300px]">
+      <div className="flex-1 w-full min-h-75">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />

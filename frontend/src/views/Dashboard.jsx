@@ -1,194 +1,126 @@
-// src/views/Dashboard.jsx
-import { useState, useEffect } from 'react';
-import { MapView } from '../components/MapView';
-import { WaterChart } from '../components/WaterChart';
-import { AirMapView } from '../components/AirMapView';
-import { AirChart } from '../components/AirChart';
-import api from '../services/api'; 
+import { useState } from "react";
+import { WaterTab } from "../components/WaterTab";
+import { AirTab } from "../components/AirTab";
+import { TourismTab } from "../components/TourismTab";
+import { IntegratedTab } from "../components/IntegratedTab";
 
 export function Dashboard() {
-  const [activeTab, setActiveTab] = useState('water'); // 'water' o 'air'
-  
-  // Estados para Agua
-  const [waterDistricts, setWaterDistricts] = useState([]);
-  const [selectedWaterData, setSelectedWaterData] = useState(null);
-  
-  // Estados para Aire
-  const [airDistricts, setAirDistricts] = useState([]);
-  const [selectedAirData, setSelectedAirData] = useState(null);
-  
-  const [threshold, setThreshold] = useState(15);
+  const [activeTab, setActiveTab] = useState("water"); // 'water', 'air', 'tourism', 'integrated'
 
-  // 1. Cargar datos de Agua
-  useEffect(() => {
-    api.get('/water/districts/')
-      .then(res => setWaterDistricts(res.data))
-      .catch(err => console.error("Error API agua:", err));
-  }, []);
+  // Estado para datos meteorológicos (AEMET)
+  const [weather] = useState({
+    temp: 28.5,
+    rainfall: 0.0,
+    station: "AEMET Fabra",
+  });
 
-  // 2. Cargar datos de Aire
-  useEffect(() => {
-    api.get('/air/districts/')
-      .then(res => setAirDistricts(res.data))
-      .catch(err => console.error("Error API aire:", err));
-  }, []);
-
-  // Handlers
-  const handleSelectWater = (id) => {
-    api.get(`/water/metrics/?district_id=${id}`)
-      .then(res => setSelectedWaterData(res.data));
-  };
-
-  const handleSelectAir = async (id) => {
-    try {
-      const res = await api.get(`/air/metrics/?district_id=${id}`);
-      setSelectedAirData(res.data);
-    } catch (err) {
-      console.error("Error cargando métricas del aire:", err);
-    }
-  };
+  const [selectedTime, setSelectedTime] = useState("09:00");
 
   return (
-    <div className="min-h-screen w-full p-4 flex flex-col gap-4 bg-slate-950 text-slate-100">
+    <div className="min-h-screen w-full p-4 flex flex-col gap-4 bg-slate-950 text-slate-100 font-sans">
       
-      {/* HEADER CON PESTAÑAS */}
-      <header className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
+      {/* HEADER PRINCIPAL */}
+      <header className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
         <div className="flex items-center gap-6">
-          <span className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-            Monitor Urbano
-          </span>
-          
+          <div>
+            <h1 className="text-xl font-bold bg-linear-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              CityFlow — Monitor Urbano
+            </h1>
+            <p className="text-xs text-slate-400">
+              Monitoreo inteligente y plataforma de decisión para Barcelona
+            </p>
+          </div>
+
           {/* BOTONES DE PESTAÑA */}
-          <div className="flex bg-slate-800/60 p-1 rounded-xl border border-slate-700/50">
+          <div className="flex bg-slate-800/60 p-1 rounded-xl border border-slate-700/50 flex-wrap gap-1">
             <button
-              onClick={() => setActiveTab('water')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'water' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+              onClick={() => setActiveTab("water")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === "water"
+                  ? "bg-cyan-500 text-slate-950 shadow-md font-bold"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
               💧 Agua
             </button>
             <button
-              onClick={() => setActiveTab('air')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'air' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+              onClick={() => setActiveTab("air")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === "air"
+                  ? "bg-cyan-500 text-slate-950 shadow-md font-bold"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              🌫️ Calidad del Aire
+              🌫️ Aire
+            </button>
+            <button
+              onClick={() => setActiveTab("tourism")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === "tourism" 
+                  ? "bg-cyan-500 text-slate-950 shadow-md font-bold"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              🏛️ Turismo
+            </button>
+            <button
+              onClick={() => setActiveTab("integrated")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === "integrated"
+                  ? "bg-cyan-500 text-slate-950 shadow-md font-bold"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              📊 Integrado
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-6 text-sm text-slate-300">
-          <div className="flex items-center gap-2 bg-slate-800/60 px-3 py-1.5 rounded-full border border-slate-700/50">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <div className="flex flex-wrap items-center gap-3">
+          
+          {/* Badge de Clima (AEMET) */}
+          <div className="flex items-center gap-2.5 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
+            <span className="flex items-center gap-1 text-slate-200 font-medium">
+              🌡️ {weather.temp} °C
+            </span>
+            <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1 text-cyan-400 font-medium">
+              🌧️ {weather.rainfall} mm
+            </span>
+            <span className="text-[10px] text-slate-500 font-normal">
+              ({weather.station})
+            </span>
+          </div>
+
+          {/* Franja Horaria */}
+          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
+            <span className="text-slate-400">Franja horaria</span>
+            <select
+              value={selectedTime}
+              onChange={(e) => setSelectedTime(e.target.value)}
+              className="bg-transparent text-cyan-400 font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="08:00">08:00</option>
+              <option value="09:00">09:00</option>
+              <option value="10:00">10:00</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 pl-2 border-l border-slate-800 text-xs text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>API Conectada</span>
           </div>
         </div>
       </header>
 
-      {/* CONTENIDO SEGÚN PESTAÑA */}
+      {/* CONTENIDO PRINCIPAL SEGÚN PESTAÑA ACTIVA */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+        {activeTab === "water" && <WaterTab />}
+        {activeTab === "air" && <AirTab />}
         
-        {/* ================= PESTAÑA: AGUA ================= */}
-        {activeTab === 'water' && (
-          <>
-            <div className="lg:col-span-7 flex flex-col gap-4">
-              <div className="h-[450px] w-full">
-                <MapView districts={waterDistricts} onSelectDistrict={handleSelectWater} />
-              </div>
-              <div className="h-[280px] w-full">
-                <WaterChart data={selectedWaterData} />
-              </div>
-            </div>
-            <div className="lg:col-span-5 flex flex-col gap-4">
-               {/* Lista de Agua (Igual que antes) */}
-               <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex-1 overflow-y-auto">
-                <h3 className="text-sm font-bold text-slate-200 mb-3">Distritos (Agua)</h3>
-                <div className="space-y-2">
-                  {waterDistricts.map((d) => (
-                    <div key={d.id} onClick={() => handleSelectWater(d.id)} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/40 hover:bg-slate-800 transition-colors cursor-pointer border border-slate-700/30">
-                      <div className="flex items-center gap-2.5">
-                        <span className={`w-2 h-2 rounded-full ${d.status === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
-                        <span className="text-sm font-medium text-slate-200">{d.district_name}</span>
-                      </div>
-                      <span className="text-xs font-semibold text-slate-400">{d.variance}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        {activeTab === "tourism" && <TourismTab />}
 
-        {/* ================= PESTAÑA: AIRE ================= */}
-        {activeTab === 'air' && (
-          <>
-            <div className="lg:col-span-7 flex flex-col gap-4">
-              <div className="h-[450px] w-full">
-                <AirMapView districts={airDistricts} onSelectDistrict={handleSelectAir} />
-              </div>
-              <div className="h-[280px] w-full">
-                <AirChart data={selectedAirData} reduction={parseInt(threshold)} />
-              </div>
-            </div>
-            <div className="lg:col-span-5 flex flex-col gap-4">
-              {/* Slider "What-If" para el Aire */}
-              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-slate-300">Simulador: Reducción de Tráfico Aéreo</span>
-                  <span className="text-cyan-400 font-bold">-{threshold}%</span>
-                </div>
-                <p className="text-xs text-slate-400 mb-3">Ajusta para ver el impacto estimado en la calidad del aire.</p>
-                <input type="range" min="0" max="50" value={threshold} onChange={(e) => setThreshold(e.target.value)} className="w-full accent-cyan-400 cursor-pointer" />
-              </div>
-
-              {/* Lista de Aire */}
-              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex-1 overflow-y-auto">
-                <h3 className="text-sm font-bold text-slate-200 mb-3">Distritos (Calidad del Aire)</h3>
-                <div className="space-y-2">
-                  {airDistricts.map((d) => {
-                    // 1. Parseamos el string de varianza a número (ej: "+15.2%" -> 15.2)
-                    const varianceNum = parseFloat(d.variance) || 0;
-                    
-                    // 2. Definimos los colores del PORCENTAJE según su propia escala
-                    let varianceColorClass = "text-slate-400"; // Neutro por defecto
-                    if (varianceNum > 10) {
-                      varianceColorClass = "text-rose-400"; // Sube mucho = Malo (Rojo)
-                    } else if (varianceNum > 0) {
-                      varianceColorClass = "text-amber-400"; // Sube poco = Alerta (Amarillo)
-                    } else if (varianceNum < -5) {
-                      varianceColorClass = "text-emerald-400"; // Baja mucho = Bueno (Verde)
-                    }
-
-                    return (
-                      <div 
-                        key={d.id} 
-                        onClick={() => handleSelectAir(d.id)} 
-                        className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/40 hover:bg-slate-800 transition-colors cursor-pointer border border-slate-700/30"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          {/* El PUNTO sigue representando el STATUS (Calidad actual) */}
-                          <span className={`w-2 h-2 rounded-full ${
-                            d.status === 'critical' ? 'bg-rose-500' : 
-                            d.status === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'
-                          }`}></span>
-                          <span className="text-sm font-medium text-slate-200">{d.district_name}</span>
-                        </div>
-                        
-                        {/* El PORCENTAJE ahora tiene su propio color */}
-                        <span className={`text-xs font-semibold ${varianceColorClass}`}>
-                          {d.variance}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
+        {activeTab === "integrated" && <IntegratedTab />}
       </div>
     </div>
   );
