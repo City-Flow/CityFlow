@@ -39,9 +39,13 @@ export function Dashboard() {
       .then(res => setSelectedWaterData(res.data));
   };
 
-  const handleSelectAir = (id) => {
-    api.get(`/air/metrics/?district_id=${id}`)
-      .then(res => setSelectedAirData(res.data));
+  const handleSelectAir = async (id) => {
+    try {
+      const res = await api.get(`/air/metrics/?district_id=${id}`);
+      setSelectedAirData(res.data);
+    } catch (err) {
+      console.error("Error cargando métricas del aire:", err);
+    }
   };
 
   return (
@@ -125,7 +129,7 @@ export function Dashboard() {
                 <AirMapView districts={airDistricts} onSelectDistrict={handleSelectAir} />
               </div>
               <div className="h-[280px] w-full">
-                <AirChart data={selectedAirData} />
+                <AirChart data={selectedAirData} reduction={parseInt(threshold)} />
               </div>
             </div>
             <div className="lg:col-span-5 flex flex-col gap-4">
@@ -143,21 +147,42 @@ export function Dashboard() {
               <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex-1 overflow-y-auto">
                 <h3 className="text-sm font-bold text-slate-200 mb-3">Distritos (Calidad del Aire)</h3>
                 <div className="space-y-2">
-                  {airDistricts.map((d) => (
-                    <div key={d.id} onClick={() => handleSelectAir(d.id)} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/40 hover:bg-slate-800 transition-colors cursor-pointer border border-slate-700/30">
-                      <div className="flex items-center gap-2.5">
-                        <span className={`w-2 h-2 rounded-full ${
-                          d.status === 'critical' ? 'bg-rose-500' : 
-                          d.status === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'
-                        }`}></span>
-                        <span className="text-sm font-medium text-slate-200">{d.district_name}</span>
+                  {airDistricts.map((d) => {
+                    // 1. Parseamos el string de varianza a número (ej: "+15.2%" -> 15.2)
+                    const varianceNum = parseFloat(d.variance) || 0;
+                    
+                    // 2. Definimos los colores del PORCENTAJE según su propia escala
+                    let varianceColorClass = "text-slate-400"; // Neutro por defecto
+                    if (varianceNum > 10) {
+                      varianceColorClass = "text-rose-400"; // Sube mucho = Malo (Rojo)
+                    } else if (varianceNum > 0) {
+                      varianceColorClass = "text-amber-400"; // Sube poco = Alerta (Amarillo)
+                    } else if (varianceNum < -5) {
+                      varianceColorClass = "text-emerald-400"; // Baja mucho = Bueno (Verde)
+                    }
+
+                    return (
+                      <div 
+                        key={d.id} 
+                        onClick={() => handleSelectAir(d.id)} 
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/40 hover:bg-slate-800 transition-colors cursor-pointer border border-slate-700/30"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {/* El PUNTO sigue representando el STATUS (Calidad actual) */}
+                          <span className={`w-2 h-2 rounded-full ${
+                            d.status === 'critical' ? 'bg-rose-500' : 
+                            d.status === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'
+                          }`}></span>
+                          <span className="text-sm font-medium text-slate-200">{d.district_name}</span>
+                        </div>
+                        
+                        {/* El PORCENTAJE ahora tiene su propio color */}
+                        <span className={`text-xs font-semibold ${varianceColorClass}`}>
+                          {d.variance}
+                        </span>
                       </div>
-                      <span className={`text-xs font-semibold ${
-                          d.status === 'critical' ? 'text-rose-400' : 
-                          d.status === 'warning' ? 'text-amber-400' : 'text-emerald-400'
-                        }`}>{d.variance}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
