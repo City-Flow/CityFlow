@@ -1,8 +1,9 @@
+// src/components/TourismTab.jsx
 import { useState, useEffect } from "react";
+import { CityMap } from "./CityMap";
 import api from "../services/api";
 
 export function TourismTab() {
-  // Datos mock / API para distritos turísticos
   const [tourismDistricts, setTourismDistricts] = useState([
     { id: 1, name: "Ciutat Vella", density: "Muy Alta", huts: 1450, occupancy: "92%", status: "critical" },
     { id: 2, name: "Eixample", density: "Alta", huts: 2100, occupancy: "88%", status: "warning" },
@@ -12,15 +13,13 @@ export function TourismTab() {
   ]);
 
   const [selectedDistrict, setSelectedDistrict] = useState(tourismDistricts[0]);
-  const [tourismSeasonFactor, setTourismSeasonFactor] = useState(1.2); // Factor de temporada alta
+  const [tourismSeasonFactor, setTourismSeasonFactor] = useState(1.2);
 
-  // Intento de carga de API si el backend ya dispone de datos de turismo
   useEffect(() => {
     api
       .get("/tourism/districts/")
       .then((res) => setTourismDistricts(res.data))
       .catch(() => {
-        // Mantiene datos por defecto si la API aún no está disponible
         console.log("Cargando datos estáticos de turismo...");
       });
   }, []);
@@ -33,10 +32,8 @@ export function TourismTab() {
 
   return (
     <>
-      {/* Izquierda: Indicadores Principales y Mapa de Aforo (8/12) */}
       <div className="lg:col-span-8 flex flex-col gap-4">
         
-        {/* Banner de Resumen de Impacto Turístico */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col justify-between">
             <span className="text-xs text-slate-400 font-medium">Afluencia Estimada Hoy</span>
@@ -65,50 +62,35 @@ export function TourismTab() {
           </div>
         </div>
 
-        {/* Panel Temporal / Mapa Placeholder */}
-        <div className="h-95 w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
-          <div className="flex justify-between items-center z-10">
-            <div>
-              <h3 className="text-sm font-bold text-slate-200">
-                Presión Turística por Distrito — {selectedDistrict.name}
-              </h3>
-              <p className="text-xs text-slate-400">Concentración de alojamientos turísticos y aforo</p>
-            </div>
-            <span className="px-2.5 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-semibold">
-              Densidad: {selectedDistrict.density}
-            </span>
-          </div>
+        <div className="h-95 w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-2 relative">
+          <CityMap
+            mode="tourism"
+            districts={tourismDistricts}
+            onSelectDistrict={(id) => {
+              const found = tourismDistricts.find((d) => d.id === id);
+              if (found) setSelectedDistrict(found);
+            }}
+          />
+        </div>
 
-          {/* Gráfico / Vista Placeholder */}
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2 border border-dashed border-slate-800 rounded-xl my-3 bg-slate-950/40">
-            <span className="text-3xl">🏛️📍</span>
-            <p className="text-xs">Mapa interactivo de aforo turístico en preparación</p>
-            <span className="text-[10px] text-slate-600">Integración con Open Data BCN (HUTs y Movilidad)</span>
+        <div className="grid grid-cols-3 gap-2 z-10 text-xs">
+          <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+            <span className="text-[10px] text-slate-400 block">Licencias HUTs</span>
+            <span className="font-bold text-slate-200">{selectedDistrict.huts} unidades</span>
           </div>
-
-          {/* Métricas del distrito seleccionado */}
-          <div className="grid grid-cols-3 gap-2 z-10 text-xs">
-            <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
-              <span className="text-[10px] text-slate-400 block">Licencias HUTs</span>
-              <span className="font-bold text-slate-200">{selectedDistrict.huts} unidades</span>
-            </div>
-            <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
-              <span className="text-[10px] text-slate-400 block">Ocupación estimada</span>
-              <span className="font-bold text-cyan-400">{selectedDistrict.occupancy}</span>
-            </div>
-            <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
-              <span className="text-[10px] text-slate-400 block">Impacto en Servicios</span>
-              <span className="font-bold text-amber-400">Alto (Agua / Movilidad)</span>
-            </div>
+          <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+            <span className="text-[10px] text-slate-400 block">Ocupación estimada</span>
+            <span className="font-bold text-cyan-400">{selectedDistrict.occupancy}</span>
+          </div>
+          <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+            <span className="text-[10px] text-slate-400 block">Impacto en Servicios</span>
+            <span className="font-bold text-amber-400">Alto (Agua / Movilidad)</span>
           </div>
         </div>
 
       </div>
 
-      {/* Derecha: Paneles de Control Turístico (4/12) */}
       <div className="lg:col-span-4 flex flex-col gap-4">
-        
-        {/* Contadores de Presión Turística */}
         <div className="grid grid-cols-3 gap-2">
           <div className="p-3 bg-slate-900/80 border border-slate-800 rounded-xl text-center">
             <span className="block text-[10px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">Baja</span>
@@ -124,7 +106,6 @@ export function TourismTab() {
           </div>
         </div>
 
-        {/* Simulador: Factor Temporada / Eventos */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md space-y-2">
           <div className="flex justify-between items-center text-xs">
             <span className="font-semibold text-slate-300">Simulador: Factor de Afluencia</span>
@@ -142,7 +123,6 @@ export function TourismTab() {
           />
         </div>
 
-        {/* Lista de Distritos Turísticos */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex-1 overflow-y-auto min-h-55">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
             Distritos y Aforo Turístico ({tourismDistricts.length})

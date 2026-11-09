@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { MapView } from "./MapView";
 import { WaterChart } from "./WaterChart";
 import api from "../services/api";
+import { CityMap } from "./CityMap";
 
 export function WaterTab() {
   const [waterDistricts, setWaterDistricts] = useState([]);
@@ -49,10 +49,7 @@ export function WaterTab() {
       {/* Izquierda: Mapa de Agua & Gráfico (8/12) */}
       <div className="lg:col-span-8 flex flex-col gap-4">
         <div className="h-105 w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-2 relative">
-          <MapView
-            districts={waterDistricts}
-            onSelectDistrict={handleSelectWater}
-          />
+          <CityMap mode="water" districts={waterDistricts} onSelectDistrict={handleSelectWater} />
         </div>
         <div className="h-65 w-full">
           <WaterChart data={selectedWaterData} />
