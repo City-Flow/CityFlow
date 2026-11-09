@@ -17,6 +17,7 @@ from .serializers import *
 from .services.air_prediction import predict_air_quality, train_all_districts
 from .services.water_anomalies import analyze_district, analyze_all_districts
 
+from .services.air_forecast import predict_air_quality_for_dashboard
 
 # ==========================================
 # 1. VIEWSETS DE PREDICCIÓN Y ANÁLISIS (IA)
@@ -139,43 +140,87 @@ class WaterDashboardViewSet(viewsets.ViewSet):
 
 class AirDashboardViewSet(viewsets.ViewSet):
     """
-    Endpoints para el panel de calidad del AIRE.
+    Endpoints para el panel de calidad del AIRE (Datos Reales).
     """
 
     @action(detail=False, methods=["get"], url_path="districts")
     def get_districts(self, request):
-        mock_districts = [
-            {"id": 1, "district_name": "Ciutat Vella", "latitude": 41.3800, "longitude": 2.1730, "current_no2": 45.2, "current_pm10": 28.5, "status": "critical", "variance": "+25.4%"},
-            {"id": 2, "district_name": "Eixample", "latitude": 41.3887, "longitude": 2.1589, "current_no2": 38.5, "current_pm10": 22.1, "status": "warning", "variance": "+15.2%"},
-            {"id": 3, "district_name": "Sants-Montjuïc", "latitude": 41.3721, "longitude": 2.1352, "current_no2": 25.0, "current_pm10": 18.4, "status": "normal", "variance": "+2.1%"},
-            {"id": 4, "district_name": "Gràcia", "latitude": 41.4025, "longitude": 2.1567, "current_no2": 18.2, "current_pm10": 15.0, "status": "optimal", "variance": "-1.5%"},
-            {"id": 5, "district_name": "Poblenou (Sant Martí)", "latitude": 41.3948, "longitude": 2.2025, "current_no2": 28.5, "current_pm10": 20.2, "status": "normal", "variance": "+4.8%"}
-        ]
-        return Response(mock_districts)
+        districts_with_data = District.objects.filter(air_qualities__isnull=False).distinct()
+        data = []
+
+        for d in districts_with_data:
+            recent_records = list(AirQuality.objects.filter(district=d).order_by("-period_date")[:30])
+            
+            if not recent_records:
+                continue
+                
+            today = recent_records[0]
+            no2 = float(today.no2_level)
+            pm10 = float(today.pm10_level)
+            last_updated = today.period_date.isoformat()
+
+            # Varianza REAL: Hoy vs Media de los últimos 30 días
+            variance_str = "0.0%"
+            if len(recent_records) > 1:
+                past_records = recent_records[1:]
+                past_avg_no2 = sum([float(r.no2_level) for r in past_records]) / len(past_records)
+                if past_avg_no2 > 0:
+                    varianza = ((no2 - past_avg_no2) / past_avg_no2) * 100
+                    variance_str = f"{varianza:+.1f}%"
+
+            if no2 > 40 or pm10 > 50:
+                status = "critical"
+            elif no2 > 25 or pm10 > 30:
+                status = "warning"
+            else:
+                status = "normal"
+
+            data.append({
+                "id": d.id,
+                "district_name": d.name,
+                "latitude": float(d.latitude),
+                "longitude": float(d.longitude),
+                "current_no2": round(no2, 1),
+                "current_pm10": round(pm10, 1),
+                "status": status,
+                "variance": variance_str,
+                "last_updated": last_updated
+            })
+
+        return Response(data)
 
     @action(detail=False, methods=["get"], url_path="metrics")
     def get_metrics(self, request):
-        district_id = int(request.query_params.get("district_id", 1))
-        names = {1: "Ciutat Vella", 2: "Eixample", 3: "Sants-Montjuïc", 4: "Gràcia", 5: "Poblenou (Sant Martí)"}
-        name = names.get(district_id, "Desconocido")
+        district_id = request.query_params.get("district_id")
+        if not district_id:
+            return Response({"error": "Falta district_id"}, status=400)
         
-        mock_metrics = {
-            "district_id": district_id,
-            "district_name": name,
-            "historical_data": [
-                {"time": "12:00", "no2": 30.0, "pm10": 15.0},
-                {"time": "14:00", "no2": 35.2, "pm10": 18.5},
-                {"time": "16:00", "no2": 42.0, "pm10": 22.0},
-                {"time": "18:00", "no2": 45.2 if district_id == 1 else 25.0, "pm10": 28.5 if district_id == 1 else 18.0}
-            ],
-            "predictions": [
-                {"time": "20:00", "predicted_no2": 48.0, "predicted_pm10": 30.0},
-                {"time": "22:00", "predicted_no2": 40.0, "predicted_pm10": 25.0},
-                {"time": "00:00", "predicted_no2": 35.0, "predicted_pm10": 20.0},
-                {"time": "02:00", "predicted_no2": 28.0, "predicted_pm10": 15.0}
-            ]
-        }
-        return Response(mock_metrics)
+        try:
+            district = District.objects.get(id=int(district_id))
+        except (ValueError, District.DoesNotExist):
+            return Response({"error": "Distrito no encontrado"}, status=404)
+
+        # Historial: Últimos 30 días
+        history_qs = AirQuality.objects.filter(district=district).order_by("-period_date")[:30]
+        history_qs = reversed(list(history_qs))
+        
+        historical_data = []
+        for h in history_qs:
+            historical_data.append({
+                "time": h.period_date.strftime("%d/%m"),
+                "no2": float(h.no2_level),
+                "pm10": float(h.pm10_level)
+            })
+
+        # Predicciones
+        predictions = predict_air_quality_for_dashboard(district, days_to_predict=7)
+
+        return Response({
+            "district_id": district.id,
+            "district_name": district.name,
+            "historical_data": historical_data,
+            "predictions": predictions
+        })
 
 
 # ==========================================

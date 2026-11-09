@@ -3,9 +3,9 @@
 Servicio de predicción de calidad del aire (NO2, PM10).
 
 Estrategia:
-  1. Baseline: repetir el último valor observado.
-  2. Modelo: RandomForestRegressor por contaminante.
-  3. Solo se adopta el modelo si mejora al baseline en validación temporal.
+1. Baseline: repetir el último valor observado.
+2. Modelo: RandomForestRegressor por contaminante.
+3. Solo se adopta el modelo si mejora al baseline en validación temporal.
 
 Entrada: AirQuality + WeatherRecord por distrito.
 Salida: AirPrediction (no2_predicted, pm10_predicted).
@@ -67,8 +67,11 @@ def _build_dataframe(district: District) -> pd.DataFrame:
         df = air_df.merge(weather_df, on="date", how="left")
     else:
         df = air_df
-        for col in ("temp_avg_celsius", "temp_max_celsius", "rainfall_mm", "humidity_percent"):
-            df[col] = np.nan
+        # Datos por defecto si no hay clima (para que no pete)
+        df["temp_avg_celsius"] = 20.0
+        df["temp_max_celsius"] = 25.0
+        df["rainfall_mm"] = 0.0
+        df["humidity_percent"] = 50.0
 
     # Features temporales
     df = df.sort_values("date").reset_index(drop=True)
