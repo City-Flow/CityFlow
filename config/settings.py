@@ -12,8 +12,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 
+
+import dj_database_url
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -142,7 +145,6 @@ CORS_ALLOWED_ORIGINS = [
 # Usamos Postgres si está definida la URL, si no SQLite (fallback)
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
-    import dj_database_url
     DATABASES = {'default': dj_database_url.config(default=DATABASE_URL)}
 else:
     DATABASES = {
