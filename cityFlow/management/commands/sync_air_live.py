@@ -163,5 +163,6 @@ class Command(BaseCommand):
                     message=msg
                 )
                 alerts_created += 1
-                
-        self.stdout.write(self.style.SUCCESS(f"🚨 {alerts_created} alertas nuevas generadas."))
+ 
+            unique_dates = set(key[1] for key in aggregated_data.keys())
+            self.stdout.write(f"📅 Fechas detectadas en el CSV: {sorted(unique_dates)}")
