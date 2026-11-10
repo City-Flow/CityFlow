@@ -2,7 +2,14 @@ import os
 from celery import Celery
 
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
-app = Celery("cityFlow")
-app.config_from_object("django.conf:settings", namespace="CELERY")
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+app = Celery('cityFlow')
+app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
+
+app.conf.beat_schedule = {
+    'sync-air-hourly': {
+        'task': 'cityFlow.tasks.sync_air_data',
+        'schedule': 3600.0, # Cada hora (en segundos)
+    },
+}
