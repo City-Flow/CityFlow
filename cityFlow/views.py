@@ -16,8 +16,8 @@ from .models import (
 from .serializers import *
 from .services.air_prediction import predict_air_quality, train_all_districts
 from .services.water_anomalies import analyze_district, analyze_all_districts
-
 from .services.air_forecast import predict_air_quality_for_dashboard
+
 
 # ==========================================
 # 1. VIEWSETS DE PREDICCIÓN Y ANÁLISIS (IA)
@@ -94,7 +94,7 @@ class PredictionViewSet(viewsets.ViewSet):
 
 
 # ==========================================
-# 2. VIEWSETS DEL DASHBOARD (MOCK DATA)
+# 2. VIEWSETS DEL DASHBOARD (DATOS REALES)
 # ==========================================
 
 class WaterDashboardViewSet(viewsets.ViewSet):
@@ -104,43 +104,66 @@ class WaterDashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="districts")
     def get_districts(self, request):
-        mock_districts = [
-            {"id": 1, "district_name": "Ciutat Vella", "latitude": 41.3800, "longitude": 2.1730, "current_consumption_m3": 1420.0, "status": "normal", "variance": "+2.5%"},
-            {"id": 2, "district_name": "Eixample", "latitude": 41.3887, "longitude": 2.1589, "current_consumption_m3": 1250.5, "status": "warning", "variance": "+17.6%"},
-            {"id": 3, "district_name": "Sants-Montjuïc", "latitude": 41.3721, "longitude": 2.1352, "current_consumption_m3": 1050.0, "status": "normal", "variance": "+4.3%"},
-            {"id": 4, "district_name": "Gràcia", "latitude": 41.4025, "longitude": 2.1567, "current_consumption_m3": 610.8, "status": "warning", "variance": "+17.7%"},
-            {"id": 5, "district_name": "Poblenou (Sant Martí)", "latitude": 41.3948, "longitude": 2.2025, "current_consumption_m3": 890.2, "status": "normal", "variance": "+1.2%"}
-        ]
-        return Response(mock_districts)
+        districts = District.objects.all()
+        data = []
+
+        for d in districts:
+            last_consumption = WaterConsumption.objects.filter(district=d).order_by("-period_date").first()
+            current_m3 = float(last_consumption.consumption_m3) if last_consumption else 0.0
+            last_updated = last_consumption.period_date.isoformat() if last_consumption else "Sin datos"
+
+            capacity = 1500.0 
+            status = "optimal"
+            if current_m3 >= (capacity * 0.9):
+                status = "critical"
+            elif current_m3 > (capacity * 0.75):
+                status = "warning"
+            elif current_m3 > (capacity * 0.5):
+                status = "normal"
+
+            data.append({
+                "id": d.id,
+                "district_name": d.name,
+                "latitude": float(d.latitude) if d.latitude else 41.38,
+                "longitude": float(d.longitude) if d.longitude else 2.17,
+                "current_consumption_m3": round(current_m3, 2),
+                "capacity_m3": capacity,
+                "status": status,
+                "variance": "+0.0%", 
+                "last_updated": last_updated
+            })
+
+        return Response(data)
 
     @action(detail=False, methods=["get"], url_path="metrics")
     def get_metrics(self, request):
         district_id = int(request.query_params.get("district_id", 1))
-        names = {1: "Ciutat Vella", 2: "Eixample", 3: "Sants-Montjuïc", 4: "Gràcia", 5: "Poblenou (Sant Martí)"}
-        name = names.get(district_id, "Desconocido")
+        district = get_object_or_404(District, id=district_id)
+
+        history = WaterConsumption.objects.filter(district=district).order_by("-period_date")[:10]
+        history = reversed(list(history))
         
-        mock_metrics = {
-            "district_id": district_id,
-            "district_name": name,
-            "historical_data": [
-                {"time": "12:00", "consumption": 1100.0, "anomaly": False},
-                {"time": "14:00", "consumption": 1180.2, "anomaly": False},
-                {"time": "16:00", "consumption": 1210.0, "anomaly": False},
-                {"time": "18:00", "consumption": 1420.0 if district_id == 1 else 1250.5, "anomaly": True if district_id == 1 else False}
-            ],
-            "predictions": [
-                {"time": "18:00", "predicted_consumption": 1250.5},
-                {"time": "20:00", "predicted_consumption": 1290.0},
-                {"time": "22:00", "predicted_consumption": 1150.0},
-                {"time": "00:00", "predicted_consumption": 980.0}
-            ]
-        }
-        return Response(mock_metrics)
+        historical_data = []
+        for h in history:
+            historical_data.append({
+                "time": h.period_date.strftime("%d/%m"),
+                "consumption": float(h.consumption_m3),
+                "anomaly": False
+            })
+
+        predictions = []
+
+        return Response({
+            "district_id": district.id,
+            "district_name": district.name,
+            "historical_data": historical_data,
+            "predictions": predictions
+        })
 
 
 class AirDashboardViewSet(viewsets.ViewSet):
     """
-    Endpoints para el panel de calidad del AIRE (Datos Reales).
+    Endpoints para el panel de calidad del AIRE.
     """
 
     @action(detail=False, methods=["get"], url_path="districts")
@@ -149,7 +172,8 @@ class AirDashboardViewSet(viewsets.ViewSet):
         data = []
 
         for d in districts_with_data:
-            recent_records = list(AirQuality.objects.filter(district=d).order_by("-period_date")[:30])
+            # ✅ CAMBIO: Traemos solo los últimos 8 días (hoy + 7 días anteriores para la media)
+            recent_records = list(AirQuality.objects.filter(district=d).order_by("-period_date")[:8])
             
             if not recent_records:
                 continue
@@ -159,21 +183,53 @@ class AirDashboardViewSet(viewsets.ViewSet):
             pm10 = float(today.pm10_level)
             last_updated = today.period_date.isoformat()
 
-            # Varianza REAL: Hoy vs Media de los últimos 30 días
+            # Cálculo de la varianza REAL (Mixta: NO2 y PM10 vs Media de 7 días)
             variance_str = "0.0%"
             if len(recent_records) > 1:
-                past_records = recent_records[1:]
+                past_records = recent_records[1:] # 7 días anteriores
+                
+                # Varianza del NO2
                 past_avg_no2 = sum([float(r.no2_level) for r in past_records]) / len(past_records)
-                if past_avg_no2 > 0:
-                    varianza = ((no2 - past_avg_no2) / past_avg_no2) * 100
-                    variance_str = f"{varianza:+.1f}%"
+                var_no2 = ((no2 - past_avg_no2) / past_avg_no2 * 100) if past_avg_no2 > 0 else 0
+                
+                # Varianza del PM10
+                past_avg_pm10 = sum([float(r.pm10_level) for r in past_records]) / len(past_records)
+                var_pm10 = ((pm10 - past_avg_pm10) / past_avg_pm10 * 100) if past_avg_pm10 > 0 else 0
+                
+                # Promedio de ambas varianzas para reflejar la tendencia global
+                varianza_media = (var_no2 + var_pm10) / 2
+                variance_str = f"{varianza_media:+.1f}%"
 
-            if no2 > 40 or pm10 > 50:
+
+            # Cálculo del status según el ICA (Índice de Calidad del Aire)
+            def get_ica_no2(val):
+                if val <= 40: return "Buena", "normal"
+                if val <= 90: return "Razonablemente buena", "normal"
+                if val <= 120: return "Regular", "warning"
+                if val <= 230: return "Desfavorable", "warning"
+                if val <= 340: return "Muy desfavorable", "critical"
+                return "Extremadamente desfavorable", "critical"
+
+            def get_ica_pm10(val):
+                if val <= 20: return "Buena", "normal"
+                if val <= 40: return "Razonablemente buena", "normal"
+                if val <= 50: return "Regular", "warning"
+                if val <= 100: return "Desfavorable", "warning"
+                if val <= 150: return "Muy desfavorable", "critical"
+                return "Extremadamente desfavorable", "critical"
+
+            cat_no2, status_no2 = get_ica_no2(no2)
+            cat_pm10, status_pm10 = get_ica_pm10(pm10)
+
+            if "critical" in (status_no2, status_pm10):
                 status = "critical"
-            elif no2 > 25 or pm10 > 30:
+                category = cat_no2 if status_no2 == "critical" else cat_pm10
+            elif "warning" in (status_no2, status_pm10):
                 status = "warning"
+                category = cat_no2 if status_no2 == "warning" else cat_pm10
             else:
                 status = "normal"
+                category = cat_no2 if cat_no2 == "Buena" else cat_pm10
 
             data.append({
                 "id": d.id,
@@ -183,6 +239,7 @@ class AirDashboardViewSet(viewsets.ViewSet):
                 "current_no2": round(no2, 1),
                 "current_pm10": round(pm10, 1),
                 "status": status,
+                "category": category, 
                 "variance": variance_str,
                 "last_updated": last_updated
             })
@@ -200,7 +257,6 @@ class AirDashboardViewSet(viewsets.ViewSet):
         except (ValueError, District.DoesNotExist):
             return Response({"error": "Distrito no encontrado"}, status=404)
 
-        # Historial: Últimos 30 días
         history_qs = AirQuality.objects.filter(district=district).order_by("-period_date")[:30]
         history_qs = reversed(list(history_qs))
         
@@ -212,7 +268,6 @@ class AirDashboardViewSet(viewsets.ViewSet):
                 "pm10": float(h.pm10_level)
             })
 
-        # Predicciones
         predictions = predict_air_quality_for_dashboard(district, days_to_predict=7)
 
         return Response({
@@ -233,21 +288,10 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return UserCreateSerializer if self.action == "create" else UserSerializer
 
-    @action(detail=False, methods=["get", "put", "patch", "delete"], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def me(self, request):
-        if request.method == "GET":
-          serializer = self.get_serializer(request.user)
-          return Response(serializer.data)
-        elif request.method in ["PUT", "PATCH"]:
-            partial = request.method == "PATCH"
-            serializer = self.get_serializer(request.user, data=request.data, partial=partial)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(serializer.data)
-        elif request.method == "DELETE":
-            request.user.delete()
-            return Response(status=http_status.HTTP_204_NO_CONTENT)
-
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
 
 
 class UserProfileViewSet(viewsets.ModelViewSet):

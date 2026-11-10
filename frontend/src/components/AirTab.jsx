@@ -8,32 +8,51 @@ export function AirTab() {
   const [selectedAirData, setSelectedAirData] = useState(null);
   const [trafficReduction, setTrafficReduction] = useState(20);
 
-  const [airLogs, setAirLogs] = useState([
-    { id: 1, type: "AIR_QUALITY_ALERT", district: "Eixample", message: "Elevada concentración de NO2 detectada", time: "18:30" },
-    { id: 2, type: "AIR_QUALITY_ALERT", district: "Ciutat Vella", message: "Nivel moderado de PM10 en la zona urbana", time: "17:15" }
-  ]);
+  // 🆕 Alertas reales que vienen de Django
+  const [airLogs, setAirLogs] = useState([]);
 
-  // Cargar datos de Aire
+  // Cargar datos de Aire y Alertas Reales
   useEffect(() => {
+    // 1. Distritos
     api
       .get("/air/districts/")
       .then((res) => setAirDistricts(res.data))
       .catch((err) => console.error("Error API aire:", err));
+
+    // 2. Alertas reales de Aire desde la base de datos
+    api
+      .get("/alerts/?alert_type=air_quality")
+      .then((res) => {
+        const formattedLogs = res.data.map((alert) => ({
+          id: alert.id,
+          type: alert.severity.toUpperCase(), // CRITICAL o WARNING
+          district: alert.district_name,
+          message: alert.message,
+          time: new Date(alert.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }));
+        setAirLogs(formattedLogs);
+      })
+      .catch((err) => console.error("Error cargando alertas:", err));
   }, []);
 
   const handleSelectAir = (id) => {
     api
       .get(`/air/metrics/?district_id=${id}`)
-      .then((res) => setSelectedAirData(res.data));
+      .then((res) => setSelectedAirData(res.data))
+      .catch((err) => console.error("Error cargando métricas:", err));
   };
 
+  // Añadir una simulación local al registro de eventos (no se guarda en BD)
   const handleSimulateAirAlert = () => {
     const newLog = {
       id: Date.now(),
-      type: "AIR_QUALITY_SIM",
-      district: "Gràcia",
-      message: `Simulación: Reducción de tráfico al ${trafficReduction}% aplicada`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: "SIMULACIÓN",
+      district: "Local",
+      message: `Reducción de tráfico al ${trafficReduction}% aplicada`,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
     setAirLogs((prev) => [newLog, ...prev]);
   };
@@ -52,7 +71,8 @@ export function AirTab() {
           <CityMap mode="air" districts={airDistricts} onSelectDistrict={handleSelectAir} />
         </div>
         <div className="h-65 w-full">
-          <AirChart data={selectedAirData} />
+          {/* Conectamos el slider con el gráfico */}
+          <AirChart data={selectedAirData} reduction={parseInt(trafficReduction)} />
         </div>
       </div>
 
@@ -100,22 +120,44 @@ export function AirTab() {
           ⚙️ Simular Reducción de Tráfico
         </button>
 
-        {/* Registro de Eventos del Aire */}
+        {/* Registro de Eventos del Aire (Reales + Simulados) */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 shadow-md max-h-45 overflow-y-auto space-y-2">
           <h3 className="text-xs font-semibold text-slate-300 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
             Alertas de Calidad del Aire
           </h3>
-          {airLogs.map((log) => (
-            <div key={log.id} className="p-2 bg-slate-950/70 border border-cyan-500/30 rounded-lg space-y-1 text-[11px]">
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span className="text-cyan-400 font-bold">{log.type}</span>
-                <span>{log.time}</span>
+          
+          {airLogs.length === 0 ? (
+            <p className="text-[11px] text-slate-500 italic py-2">No hay alertas recientes registradas.</p>
+          ) : (
+            airLogs.map((log) => (
+              <div 
+                key={log.id} 
+                className={`p-2 bg-slate-950/70 border rounded-lg space-y-1 text-[11px] ${
+                  log.type === "CRITICAL" 
+                    ? "border-rose-500/30" 
+                    : log.type === "WARNING" 
+                      ? "border-amber-500/30" 
+                      : "border-cyan-500/30"
+                }`}
+              >
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span className={`font-bold ${
+                    log.type === "CRITICAL" 
+                      ? "text-rose-400" 
+                      : log.type === "WARNING" 
+                        ? "text-amber-400" 
+                        : "text-cyan-400"
+                  }`}>
+                    {log.type}
+                  </span>
+                  <span>{log.time}</span>
+                </div>
+                <p className="text-slate-300 font-medium">{log.district}</p>
+                <p className="text-slate-400 text-[10px]">{log.message}</p>
               </div>
-              <p className="text-slate-300 font-medium">{log.district}</p>
-              <p className="text-slate-400 text-[10px]">{log.message}</p>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Lista de Distritos (Aire) */}
@@ -131,6 +173,7 @@ export function AirTab() {
                 className="flex items-center justify-between p-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 transition-colors cursor-pointer border border-slate-700/30 text-xs"
               >
                 <div className="flex items-center gap-2">
+                  {/* El punto depende del status (Calidad actual) */}
                   <span
                     className={`w-2 h-2 rounded-full ${
                       d.status === "critical"
@@ -144,16 +187,17 @@ export function AirTab() {
                     {d.district_name || d.name}
                   </span>
                 </div>
+                {/* El texto (Variance) depende de su propio valor numérico */}
                 <span
                   className={`font-semibold ${
-                    d.status === "critical"
-                      ? "text-rose-400"
-                      : d.status === "warning"
-                        ? "text-amber-400"
+                    parseFloat(d.variance) > 10
+                      ? "text-rose-400" 
+                      : parseFloat(d.variance) > 0
+                        ? "text-amber-400" 
                         : "text-emerald-400"
                   }`}
                 >
-                  {d.variance || "0.0 AQI"}
+                  {d.variance || "0.0%"}
                 </span>
               </div>
             ))}
