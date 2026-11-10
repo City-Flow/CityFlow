@@ -92,20 +92,6 @@ export function Dashboard() {
             </span>
           </div>
 
-          {/* Franja Horaria */}
-          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
-            <span className="text-slate-400">Franja horaria</span>
-            <select
-              value={selectedTime}
-              onChange={(e) => setSelectedTime(e.target.value)}
-              className="bg-transparent text-cyan-400 font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="08:00">08:00</option>
-              <option value="09:00">09:00</option>
-              <option value="10:00">10:00</option>
-            </select>
-          </div>
-
           <div className="flex items-center gap-2 pl-2 border-l border-slate-800 text-xs text-slate-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>API Conectada</span>
