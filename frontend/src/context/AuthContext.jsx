@@ -18,7 +18,6 @@ export const AuthProvider = ({ children }) => {
       const storedToken = localStorage.getItem('token');
       if (storedToken) {
         try {
-          // Se añade el header explícito para evitar problemas al recargar
           const response = await api.get('/users/me/', {
             headers: { Authorization: `Bearer ${storedToken}` },
           });
@@ -53,8 +52,27 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
+  // 1. Añadir la función para actualizar el perfil
+  const updateProfile = async (userData) => {
+    const storedToken = localStorage.getItem('token');
+    const response = await api.patch('/users/me/', userData, {
+      headers: { Authorization: `Bearer ${storedToken}` },
+    });
+    setUser(response.data);
+    return response.data;
+  };
+
+  // 2. Añadir la función para eliminar la cuenta
+  const deleteAccount = async () => {
+    const storedToken = localStorage.getItem('token');
+    await api.delete('/users/me/', {
+      headers: { Authorization: `Bearer ${storedToken}` },
+    });
+    logout();
+  };
+
   return (
-    <AuthContextObject.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContextObject.Provider value={{ user, token, loading, login, register, logout, updateProfile, deleteAccount }}>
       {children}
     </AuthContextObject.Provider>
   );

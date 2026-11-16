@@ -16,6 +16,7 @@ from .models import (
 from .serializers import *
 from .services.air_prediction import predict_air_quality, train_all_districts
 from .services.water_anomalies import analyze_district, analyze_all_districts
+from .services.air_forecast import predict_air_quality_for_dashboard
 
 
 # ==========================================
@@ -93,50 +94,86 @@ class PredictionViewSet(viewsets.ViewSet):
 
 
 # ==========================================
-# 2. VIEWSETS DEL DASHBOARD (MOCK DATA)
+# 2. VIEWSETS DEL DASHBOARD (DATOS REALES)
 # ==========================================
 
 class WaterDashboardViewSet(viewsets.ViewSet):
-    """
-    Endpoints para el panel de resiliencia urbana de AGUA.
-    """
-
     @action(detail=False, methods=["get"], url_path="districts")
     def get_districts(self, request):
-        mock_districts = [
-            {"id": 1, "district_name": "Ciutat Vella", "latitude": 41.3800, "longitude": 2.1730, "current_consumption_m3": 1420.0, "status": "normal", "variance": "+2.5%"},
-            {"id": 2, "district_name": "Eixample", "latitude": 41.3887, "longitude": 2.1589, "current_consumption_m3": 1250.5, "status": "warning", "variance": "+17.6%"},
-            {"id": 3, "district_name": "Sants-Montjuïc", "latitude": 41.3721, "longitude": 2.1352, "current_consumption_m3": 1050.0, "status": "normal", "variance": "+4.3%"},
-            {"id": 4, "district_name": "Gràcia", "latitude": 41.4025, "longitude": 2.1567, "current_consumption_m3": 610.8, "status": "warning", "variance": "+17.7%"},
-            {"id": 5, "district_name": "Poblenou (Sant Martí)", "latitude": 41.3948, "longitude": 2.2025, "current_consumption_m3": 890.2, "status": "normal", "variance": "+1.2%"}
-        ]
-        return Response(mock_districts)
+        districts = District.objects.filter(water_consumptions__isnull=False).distinct()
+        data = []
+
+        for d in districts:
+            # Último registro real
+            last = WaterConsumption.objects.filter(district=d).order_by("-period_date").first()
+            if not last:
+                continue
+
+            current_m3 = float(last.consumption_m3)
+            last_updated = last.period_date.isoformat()
+
+            # Varianza: comparar con el año anterior
+            prev = WaterConsumption.objects.filter(
+                district=d, period_date__lt=last.period_date
+            ).order_by("-period_date").first()
+
+            variance_str = "0.0%"
+            if prev and float(prev.consumption_m3) > 0:
+                var = ((current_m3 - float(prev.consumption_m3)) / float(prev.consumption_m3)) * 100
+                variance_str = f"{var:+.1f}%"
+
+            # Status: capacidad simulada (ajusta según la escala real de datos)
+            capacity = max([float(w.consumption_m3) for w in WaterConsumption.objects.filter(district=d)])
+            if current_m3 > capacity * 0.9:
+                status = "critical"
+            elif current_m3 > capacity * 0.75:
+                status = "warning"
+            else:
+                status = "normal"
+
+            data.append({
+                "id": d.id,
+                "district_name": d.name,
+                "latitude": float(d.latitude),
+                "longitude": float(d.longitude),
+                "current_consumption_m3": round(current_m3, 2),
+                "capacity_m3": round(capacity, 2),
+                "status": status,
+                "variance": variance_str,
+                "last_updated": last_updated
+            })
+
+        return Response(data)
 
     @action(detail=False, methods=["get"], url_path="metrics")
     def get_metrics(self, request):
-        district_id = int(request.query_params.get("district_id", 1))
-        names = {1: "Ciutat Vella", 2: "Eixample", 3: "Sants-Montjuïc", 4: "Gràcia", 5: "Poblenou (Sant Martí)"}
-        name = names.get(district_id, "Desconocido")
+        district_id = request.query_params.get("district_id")
+        if not district_id:
+            return Response({"error": "Falta district_id"}, status=400)
         
-        mock_metrics = {
-            "district_id": district_id,
-            "district_name": name,
-            "historical_data": [
-                {"time": "12:00", "consumption": 1100.0, "anomaly": False},
-                {"time": "14:00", "consumption": 1180.2, "anomaly": False},
-                {"time": "16:00", "consumption": 1210.0, "anomaly": False},
-                {"time": "18:00", "consumption": 1420.0 if district_id == 1 else 1250.5, "anomaly": True if district_id == 1 else False}
-            ],
-            "predictions": [
-                {"time": "18:00", "predicted_consumption": 1250.5},
-                {"time": "20:00", "predicted_consumption": 1290.0},
-                {"time": "22:00", "predicted_consumption": 1150.0},
-                {"time": "00:00", "predicted_consumption": 980.0}
-            ]
-        }
-        return Response(mock_metrics)
+        try:
+            district = District.objects.get(id=int(district_id))
+        except (ValueError, District.DoesNotExist):
+            return Response({"error": "Distrito no encontrado"}, status=404)
 
+        # Historial: todos los años disponibles (o los últimos 10)
+        history_qs = WaterConsumption.objects.filter(district=district).order_by("-period_date")[:10]
+        history_qs = reversed(list(history_qs))
+        
+        historical_data = []
+        for h in history_qs:
+            historical_data.append({
+                "time": str(h.period_date.year),
+                "consumption": float(h.consumption_m3)
+            })
 
+        return Response({
+            "district_id": district.id,
+            "district_name": district.name,
+            "historical_data": historical_data,
+            "predictions": []  # Sin predicciones por ahora (podríamos hacer una regresión simple si quisiéramos)
+        })
+    
 class AirDashboardViewSet(viewsets.ViewSet):
     """
     Endpoints para el panel de calidad del AIRE.
@@ -144,40 +181,177 @@ class AirDashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="districts")
     def get_districts(self, request):
-        mock_districts = [
-            {"id": 1, "district_name": "Ciutat Vella", "latitude": 41.3800, "longitude": 2.1730, "current_no2": 45.2, "current_pm10": 28.5, "status": "critical", "variance": "+25.4%"},
-            {"id": 2, "district_name": "Eixample", "latitude": 41.3887, "longitude": 2.1589, "current_no2": 38.5, "current_pm10": 22.1, "status": "warning", "variance": "+15.2%"},
-            {"id": 3, "district_name": "Sants-Montjuïc", "latitude": 41.3721, "longitude": 2.1352, "current_no2": 25.0, "current_pm10": 18.4, "status": "normal", "variance": "+2.1%"},
-            {"id": 4, "district_name": "Gràcia", "latitude": 41.4025, "longitude": 2.1567, "current_no2": 18.2, "current_pm10": 15.0, "status": "optimal", "variance": "-1.5%"},
-            {"id": 5, "district_name": "Poblenou (Sant Martí)", "latitude": 41.3948, "longitude": 2.2025, "current_no2": 28.5, "current_pm10": 20.2, "status": "normal", "variance": "+4.8%"}
-        ]
-        return Response(mock_districts)
+        districts_with_data = District.objects.filter(air_qualities__isnull=False).distinct()
+        data = []
+
+        for d in districts_with_data:
+            # ✅ CAMBIO: Traemos solo los últimos 8 días (hoy + 7 días anteriores para la media)
+            recent_records = list(AirQuality.objects.filter(district=d).order_by("-period_date")[:8])
+            
+            if not recent_records:
+                continue
+                
+            today = recent_records[0]
+            no2 = float(today.no2_level)
+            pm10 = float(today.pm10_level)
+            last_updated = today.period_date.isoformat()
+
+            # Cálculo de la varianza REAL (Mixta: NO2 y PM10 vs Media de 7 días)
+            variance_str = "0.0%"
+            if len(recent_records) > 1:
+                past_records = recent_records[1:] # 7 días anteriores
+                
+                # Varianza del NO2
+                past_avg_no2 = sum([float(r.no2_level) for r in past_records]) / len(past_records)
+                var_no2 = ((no2 - past_avg_no2) / past_avg_no2 * 100) if past_avg_no2 > 0 else 0
+                
+                # Varianza del PM10
+                past_avg_pm10 = sum([float(r.pm10_level) for r in past_records]) / len(past_records)
+                var_pm10 = ((pm10 - past_avg_pm10) / past_avg_pm10 * 100) if past_avg_pm10 > 0 else 0
+                
+                # Promedio de ambas varianzas para reflejar la tendencia global
+                varianza_media = (var_no2 + var_pm10) / 2
+                variance_str = f"{varianza_media:+.1f}%"
+
+
+            # Cálculo del status según el ICA (Índice de Calidad del Aire)
+            def get_ica_no2(val):
+                if val <= 40: return "Buena", "normal"
+                if val <= 90: return "Razonablemente buena", "normal"
+                if val <= 120: return "Regular", "warning"
+                if val <= 230: return "Desfavorable", "warning"
+                if val <= 340: return "Muy desfavorable", "critical"
+                return "Extremadamente desfavorable", "critical"
+
+            def get_ica_pm10(val):
+                if val <= 20: return "Buena", "normal"
+                if val <= 40: return "Razonablemente buena", "normal"
+                if val <= 50: return "Regular", "warning"
+                if val <= 100: return "Desfavorable", "warning"
+                if val <= 150: return "Muy desfavorable", "critical"
+                return "Extremadamente desfavorable", "critical"
+
+            cat_no2, status_no2 = get_ica_no2(no2)
+            cat_pm10, status_pm10 = get_ica_pm10(pm10)
+
+            if "critical" in (status_no2, status_pm10):
+                status = "critical"
+                category = cat_no2 if status_no2 == "critical" else cat_pm10
+            elif "warning" in (status_no2, status_pm10):
+                status = "warning"
+                category = cat_no2 if status_no2 == "warning" else cat_pm10
+            else:
+                status = "normal"
+                category = cat_no2 if cat_no2 == "Buena" else cat_pm10
+
+            data.append({
+                "id": d.id,
+                "district_name": d.name,
+                "latitude": float(d.latitude),
+                "longitude": float(d.longitude),
+                "current_no2": round(no2, 1),
+                "current_pm10": round(pm10, 1),
+                "status": status,
+                "category": category, 
+                "variance": variance_str,
+                "last_updated": last_updated
+            })
+
+        return Response(data)
 
     @action(detail=False, methods=["get"], url_path="metrics")
     def get_metrics(self, request):
-        district_id = int(request.query_params.get("district_id", 1))
-        names = {1: "Ciutat Vella", 2: "Eixample", 3: "Sants-Montjuïc", 4: "Gràcia", 5: "Poblenou (Sant Martí)"}
-        name = names.get(district_id, "Desconocido")
+        district_id = request.query_params.get("district_id")
+        if not district_id:
+            return Response({"error": "Falta district_id"}, status=400)
         
-        mock_metrics = {
-            "district_id": district_id,
-            "district_name": name,
-            "historical_data": [
-                {"time": "12:00", "no2": 30.0, "pm10": 15.0},
-                {"time": "14:00", "no2": 35.2, "pm10": 18.5},
-                {"time": "16:00", "no2": 42.0, "pm10": 22.0},
-                {"time": "18:00", "no2": 45.2 if district_id == 1 else 25.0, "pm10": 28.5 if district_id == 1 else 18.0}
-            ],
-            "predictions": [
-                {"time": "20:00", "predicted_no2": 48.0, "predicted_pm10": 30.0},
-                {"time": "22:00", "predicted_no2": 40.0, "predicted_pm10": 25.0},
-                {"time": "00:00", "predicted_no2": 35.0, "predicted_pm10": 20.0},
-                {"time": "02:00", "predicted_no2": 28.0, "predicted_pm10": 15.0}
-            ]
-        }
-        return Response(mock_metrics)
+        try:
+            district = District.objects.get(id=int(district_id))
+        except (ValueError, District.DoesNotExist):
+            return Response({"error": "Distrito no encontrado"}, status=404)
 
+        history_qs = AirQuality.objects.filter(district=district).order_by("-period_date")[:30]
+        history_qs = reversed(list(history_qs))
+        
+        historical_data = []
+        for h in history_qs:
+            historical_data.append({
+                "time": h.period_date.strftime("%d/%m"),
+                "no2": float(h.no2_level),
+                "pm10": float(h.pm10_level)
+            })
 
+        predictions = predict_air_quality_for_dashboard(district, days_to_predict=7)
+
+        return Response({
+            "district_id": district.id,
+            "district_name": district.name,
+            "historical_data": historical_data,
+            "predictions": predictions
+        })
+
+class TourismDashboardViewSet(viewsets.ViewSet):
+    @action(detail=False, methods=["get"], url_path="districts")
+    def get_districts(self, request):
+        districts = District.objects.filter(tourism_pressures__isnull=False).distinct()
+        data = []
+        for d in districts:
+            last = TourismPressure.objects.filter(district=d).order_by("-period_date").first()
+            if not last:
+                continue
+            
+            # Status basado en el número de HUTs
+            if last.hut_count > 800:
+                status = "critical"
+            elif last.hut_count > 300:
+                status = "warning"
+            else:
+                status = "normal"
+            
+            data.append({
+                "id": d.id,
+                "district_name": d.name,
+                "latitude": float(d.latitude),
+                "longitude": float(d.longitude),
+                "hut_count": last.hut_count,
+                "avg_noise_db": float(last.avg_noise_db),
+                "status": status,
+                "variance": "+0.0%", # Placeholder
+                "last_updated": last.period_date.isoformat()
+            })
+        return Response(data)
+
+    @action(detail=False, methods=["get"], url_path="metrics")
+    def get_metrics(self, request):
+        district_id = request.query_params.get("district_id")
+        if not district_id:
+            return Response({"error": "Falta district_id"}, status=400)
+        
+        try:
+            district = District.objects.get(id=int(district_id))
+        except (ValueError, District.DoesNotExist):
+            return Response({"error": "Distrito no encontrado"}, status=404)
+
+        history = list(TourismPressure.objects.filter(district=district).order_by("period_date"))
+        
+        historical_data = []
+        prev_count = 0
+        
+        for h in history:
+            # El incremento es el total acumulado actual menos el anterior
+            increment = h.hut_count - prev_count
+            historical_data.append({
+                "year": h.period_date.year,
+                "total_huts": h.hut_count,     # Línea (Acumulado)
+                "new_huts": increment          # Barra (Incremento del año)
+            })
+            prev_count = h.hut_count
+
+        return Response({
+            "district_id": district.id,
+            "district_name": district.name,
+            "historical_data": historical_data
+        })
 # ==========================================
 # 3. VIEWSETS CRUD (MODELOS)
 # ==========================================
