@@ -290,7 +290,68 @@ class AirDashboardViewSet(viewsets.ViewSet):
             "predictions": predictions
         })
 
+class TourismDashboardViewSet(viewsets.ViewSet):
+    @action(detail=False, methods=["get"], url_path="districts")
+    def get_districts(self, request):
+        districts = District.objects.filter(tourism_pressures__isnull=False).distinct()
+        data = []
+        for d in districts:
+            last = TourismPressure.objects.filter(district=d).order_by("-period_date").first()
+            if not last:
+                continue
+            
+            # Status basado en el número de HUTs
+            if last.hut_count > 800:
+                status = "critical"
+            elif last.hut_count > 300:
+                status = "warning"
+            else:
+                status = "normal"
+            
+            data.append({
+                "id": d.id,
+                "district_name": d.name,
+                "latitude": float(d.latitude),
+                "longitude": float(d.longitude),
+                "hut_count": last.hut_count,
+                "avg_noise_db": float(last.avg_noise_db),
+                "status": status,
+                "variance": "+0.0%", # Placeholder
+                "last_updated": last.period_date.isoformat()
+            })
+        return Response(data)
 
+    @action(detail=False, methods=["get"], url_path="metrics")
+    def get_metrics(self, request):
+        district_id = request.query_params.get("district_id")
+        if not district_id:
+            return Response({"error": "Falta district_id"}, status=400)
+        
+        try:
+            district = District.objects.get(id=int(district_id))
+        except (ValueError, District.DoesNotExist):
+            return Response({"error": "Distrito no encontrado"}, status=404)
+
+        history = list(TourismPressure.objects.filter(district=district).order_by("period_date"))
+        
+        historical_data = []
+        prev_count = 0
+        
+        for h in history:
+            # El incremento es el total acumulado actual menos el anterior
+            increment = h.hut_count - prev_count
+            historical_data.append({
+                "year": h.period_date.year,
+                "total_huts": h.hut_count,     # Línea (Acumulado)
+                "new_huts": increment          # Barra (Incremento del año)
+            })
+            prev_count = h.hut_count
+
+        return Response({
+            "district_id": district.id,
+            "district_name": district.name,
+            "historical_data": historical_data
+        })
 # ==========================================
 # 3. VIEWSETS CRUD (MODELOS)
 # ==========================================
