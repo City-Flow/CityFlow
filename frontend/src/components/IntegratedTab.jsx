@@ -15,6 +15,7 @@ export function IntegratedTab() {
 
   return (
     <>
+    
       <div className="lg:col-span-8 flex flex-col gap-4">
         
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col gap-1">
@@ -37,6 +38,20 @@ export function IntegratedTab() {
           />
         </div>
 
+        <div className="bg-cyan-950/40 border border-cyan-800/50 rounded-xl p-4 mb-4">
+          <h3 className="text-sm font-bold text-cyan-300 flex items-center gap-2 mb-1">
+            🚧 Módulo en desarrollo (Próxima iteración)
+          </h3>
+          <p className="text-xs text-cyan-200/70">
+            Esta pestaña muestra una <strong>simulación conceptual</strong> del cruce de datos. 
+            Para su implementación real se requiere:
+          </p>
+          <ul className="text-xs text-cyan-200/70 list-disc list-inside mt-2 space-y-1">
+            <li>Un modelo de ML entrenado para ponderar el riesgo (aire + agua + turismo).</li>
+            <li>Acceso a las APIs en tiempo real de AEMET, Open Data BCN y Aigües de Barcelona.</li>
+            <li>Un histórico de datos alineado temporalmente (horario/diario).</li>
+          </ul>
+        </div>    
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 shadow-md flex-1 overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>

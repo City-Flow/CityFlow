@@ -98,38 +98,48 @@ class PredictionViewSet(viewsets.ViewSet):
 # ==========================================
 
 class WaterDashboardViewSet(viewsets.ViewSet):
-    """
-    Endpoints para el panel de resiliencia urbana de AGUA.
-    """
-
     @action(detail=False, methods=["get"], url_path="districts")
     def get_districts(self, request):
-        districts = District.objects.all()
+        districts = District.objects.filter(water_consumptions__isnull=False).distinct()
         data = []
 
         for d in districts:
-            last_consumption = WaterConsumption.objects.filter(district=d).order_by("-period_date").first()
-            current_m3 = float(last_consumption.consumption_m3) if last_consumption else 0.0
-            last_updated = last_consumption.period_date.isoformat() if last_consumption else "Sin datos"
+            # Último registro real
+            last = WaterConsumption.objects.filter(district=d).order_by("-period_date").first()
+            if not last:
+                continue
 
-            capacity = 1500.0 
-            status = "optimal"
-            if current_m3 >= (capacity * 0.9):
+            current_m3 = float(last.consumption_m3)
+            last_updated = last.period_date.isoformat()
+
+            # Varianza: comparar con el año anterior
+            prev = WaterConsumption.objects.filter(
+                district=d, period_date__lt=last.period_date
+            ).order_by("-period_date").first()
+
+            variance_str = "0.0%"
+            if prev and float(prev.consumption_m3) > 0:
+                var = ((current_m3 - float(prev.consumption_m3)) / float(prev.consumption_m3)) * 100
+                variance_str = f"{var:+.1f}%"
+
+            # Status: capacidad simulada (ajusta según la escala real de datos)
+            capacity = max([float(w.consumption_m3) for w in WaterConsumption.objects.filter(district=d)])
+            if current_m3 > capacity * 0.9:
                 status = "critical"
-            elif current_m3 > (capacity * 0.75):
+            elif current_m3 > capacity * 0.75:
                 status = "warning"
-            elif current_m3 > (capacity * 0.5):
+            else:
                 status = "normal"
 
             data.append({
                 "id": d.id,
                 "district_name": d.name,
-                "latitude": float(d.latitude) if d.latitude else 41.38,
-                "longitude": float(d.longitude) if d.longitude else 2.17,
+                "latitude": float(d.latitude),
+                "longitude": float(d.longitude),
                 "current_consumption_m3": round(current_m3, 2),
-                "capacity_m3": capacity,
+                "capacity_m3": round(capacity, 2),
                 "status": status,
-                "variance": "+0.0%", 
+                "variance": variance_str,
                 "last_updated": last_updated
             })
 
@@ -137,30 +147,33 @@ class WaterDashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="metrics")
     def get_metrics(self, request):
-        district_id = int(request.query_params.get("district_id", 1))
-        district = get_object_or_404(District, id=district_id)
+        district_id = request.query_params.get("district_id")
+        if not district_id:
+            return Response({"error": "Falta district_id"}, status=400)
+        
+        try:
+            district = District.objects.get(id=int(district_id))
+        except (ValueError, District.DoesNotExist):
+            return Response({"error": "Distrito no encontrado"}, status=404)
 
-        history = WaterConsumption.objects.filter(district=district).order_by("-period_date")[:10]
-        history = reversed(list(history))
+        # Historial: todos los años disponibles (o los últimos 10)
+        history_qs = WaterConsumption.objects.filter(district=district).order_by("-period_date")[:10]
+        history_qs = reversed(list(history_qs))
         
         historical_data = []
-        for h in history:
+        for h in history_qs:
             historical_data.append({
-                "time": h.period_date.strftime("%d/%m"),
-                "consumption": float(h.consumption_m3),
-                "anomaly": False
+                "time": str(h.period_date.year),
+                "consumption": float(h.consumption_m3)
             })
-
-        predictions = []
 
         return Response({
             "district_id": district.id,
             "district_name": district.name,
             "historical_data": historical_data,
-            "predictions": predictions
+            "predictions": []  # Sin predicciones por ahora (podríamos hacer una regresión simple si quisiéramos)
         })
-
-
+    
 class AirDashboardViewSet(viewsets.ViewSet):
     """
     Endpoints para el panel de calidad del AIRE.
@@ -277,7 +290,68 @@ class AirDashboardViewSet(viewsets.ViewSet):
             "predictions": predictions
         })
 
+class TourismDashboardViewSet(viewsets.ViewSet):
+    @action(detail=False, methods=["get"], url_path="districts")
+    def get_districts(self, request):
+        districts = District.objects.filter(tourism_pressures__isnull=False).distinct()
+        data = []
+        for d in districts:
+            last = TourismPressure.objects.filter(district=d).order_by("-period_date").first()
+            if not last:
+                continue
+            
+            # Status basado en el número de HUTs
+            if last.hut_count > 800:
+                status = "critical"
+            elif last.hut_count > 300:
+                status = "warning"
+            else:
+                status = "normal"
+            
+            data.append({
+                "id": d.id,
+                "district_name": d.name,
+                "latitude": float(d.latitude),
+                "longitude": float(d.longitude),
+                "hut_count": last.hut_count,
+                "avg_noise_db": float(last.avg_noise_db),
+                "status": status,
+                "variance": "+0.0%", # Placeholder
+                "last_updated": last.period_date.isoformat()
+            })
+        return Response(data)
 
+    @action(detail=False, methods=["get"], url_path="metrics")
+    def get_metrics(self, request):
+        district_id = request.query_params.get("district_id")
+        if not district_id:
+            return Response({"error": "Falta district_id"}, status=400)
+        
+        try:
+            district = District.objects.get(id=int(district_id))
+        except (ValueError, District.DoesNotExist):
+            return Response({"error": "Distrito no encontrado"}, status=404)
+
+        history = list(TourismPressure.objects.filter(district=district).order_by("period_date"))
+        
+        historical_data = []
+        prev_count = 0
+        
+        for h in history:
+            # El incremento es el total acumulado actual menos el anterior
+            increment = h.hut_count - prev_count
+            historical_data.append({
+                "year": h.period_date.year,
+                "total_huts": h.hut_count,     # Línea (Acumulado)
+                "new_huts": increment          # Barra (Incremento del año)
+            })
+            prev_count = h.hut_count
+
+        return Response({
+            "district_id": district.id,
+            "district_name": district.name,
+            "historical_data": historical_data
+        })
 # ==========================================
 # 3. VIEWSETS CRUD (MODELOS)
 # ==========================================

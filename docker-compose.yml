@@ -25,6 +25,7 @@ services:
     environment:
       - DATABASE_URL=postgres://cityflow_user:cityflow_pass@db:5432/cityflow_db
       - REDIS_URL=redis://redis:6379/0
+      - DJANGO_ENV=dev
     depends_on:
       - db
       - redis

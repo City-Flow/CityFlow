@@ -19,9 +19,9 @@ router.register(r"incidents", IncidentReportViewSet)
 router.register(r"alerts", AlertViewSet)
 router.register(r"predictions", PredictionViewSet, basename="predictions")
 
-# 🆕 Rutas para los Dashboards (Mock Data)
 router.register(r"water", WaterDashboardViewSet, basename="water-dashboard")
 router.register(r"air", AirDashboardViewSet, basename="air-dashboard")
+router.register(r"tourism", TourismDashboardViewSet, basename="tourism-dashboard")  
 
 
 urlpatterns = [
