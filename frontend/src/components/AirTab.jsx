@@ -19,11 +19,20 @@ export function AirTab() {
       .then((res) => setAirDistricts(res.data))
       .catch((err) => console.error("Error API aire:", err));
 
-    // 2. Alertas reales de Aire desde la base de datos
+    // 2. Alertas reales de Aire desde la base de datos (Filtradas por 24h)
     api
       .get("/alerts/?alert_type=air_quality")
       .then((res) => {
-        const formattedLogs = res.data.map((alert) => ({
+        const now = new Date();
+        // Filtramos solo las alertas de las últimas 24 horas
+        const recentAlerts = res.data.filter((alert) => {
+          const alertDate = new Date(alert.created_at);
+          const hoursDiff = (now - alertDate) / (1000 * 60 * 60);
+          return hoursDiff < 24;
+        });
+
+        // Formateamos las alertas al formato que espera el frontend
+        const formattedLogs = recentAlerts.map((alert) => ({
           id: alert.id,
           type: alert.severity.toUpperCase(), // CRITICAL o WARNING
           district: alert.district_name,
@@ -33,9 +42,74 @@ export function AirTab() {
             minute: "2-digit",
           }),
         }));
+        
         setAirLogs(formattedLogs);
       })
       .catch((err) => console.error("Error cargando alertas:", err));
+  }, []);
+
+  // 🆕 CONEXIÓN WEBSOCKET EN TIEMPO REAL
+  useEffect(() => {
+    let ws = null;
+    let reconnectTimeout = null;
+
+    const connectWebSocket = () => {
+      ws = new WebSocket("ws://127.0.0.1:8000/ws/alerts/");
+
+      ws.onopen = () => {
+        console.log("✅ Conectado al WebSocket de alertas. Listo para recibir.");
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        // Ignoramos el mensaje de bienvenida
+        if (data.type === "connection.established") return;
+
+        // Si es una alerta nueva, la añadimos a la lista
+        if (data.type === "air_quality.created") {
+          console.log("📩 Alerta en tiempo real recibida:", data);
+          
+          const newAlert = {
+            id: data.alert_id,
+            type: data.severity.toUpperCase(),
+            district: data.district_name,
+            message: data.message,
+            time: new Date(data.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          };
+          
+          setAirLogs((prevLogs) => [newAlert, ...prevLogs]);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("🔌 WebSocket desconectado. Reintentando en 3 segundos...");
+        // Reconexión automática si se cae
+        reconnectTimeout = setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = (error) => {
+        // Silenciamos el error de StrictMode para no asustar en la consola
+        if (ws.readyState !== WebSocket.CLOSED) {
+          console.error("❌ Error en WebSocket:", error);
+        }
+      };
+    };
+
+    // Iniciamos la conexión
+    connectWebSocket();
+
+    // Limpieza al desmontar (StrictMode)
+    return () => {
+      if (ws) {
+        ws.onclose = null; // Evitamos que salte el reconector al desmontar
+        ws.close();
+      }
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
   }, []);
 
   const handleSelectAir = (id) => {
