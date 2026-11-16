@@ -301,7 +301,7 @@ class TourismDashboardViewSet(viewsets.ViewSet):
                 continue
             
             # Status basado en el número de HUTs
-            if last.hut_count > 800:
+            if last.hut_count > 1000:
                 status = "critical"
             elif last.hut_count > 300:
                 status = "warning"
