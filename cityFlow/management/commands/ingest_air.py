@@ -9,9 +9,12 @@ from cityFlow.models import AirQuality, District
 
 class Command(BaseCommand):
     help = "Ingesta masiva (histórico y actual) con agregación de medias"
+    
+    def add_arguments(self, parser):
+        parser.add_argument("--path", type=str, default="cityFlow/data/historico")
 
     def handle(self, *args, **options):
-        data_dir = "cityFlow/data/historico"
+        data_dir = options.get("path", "cityFlow/data/historico")
         csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
         
         if not csv_files:
