@@ -1,4 +1,3 @@
-<img width="1878" height="939" alt="Screenshot 2026-11-21 134238" src="https://github.com/user-attachments/assets/7c31534f-7e58-49a9-843a-6ac9f11d7444" />
 # 🌆 CityFlow — Monitor Urbano de Resiliencia (Barcelona)
 
 **CityFlow** es una plataforma Full Stack de análisis de resiliencia urbana para la ciudad de Barcelona. Su objetivo es monitorizar, predecir y alertar sobre el estado de tres ejes fundamentales para la sostenibilidad de la ciudad: **la calidad del aire**, **el consumo de agua** y **la presión turística**.
