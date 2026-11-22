@@ -1,10 +1,9 @@
 # 🌆 CityFlow — Monitor Urbano de Resiliencia (Barcelona)
 
-**CityFlow** es una plataforma Full Stack de análisis de resiliencia urbana para la ciudad de Barcelona. Su objetivo es monitorizar, predecir y alertar sobre el estado de tres ejes fundamentales para la sostenibilidad de la ciudad: **la calidad del aire**, **el consumo de agua** y **la presión turística**. 
+**CityFlow** es una plataforma Full Stack de análisis de resiliencia urbana para la ciudad de Barcelona. Su objetivo es monitorizar, predecir y alertar sobre el estado de tres ejes fundamentales para la sostenibilidad de la ciudad: **la calidad del aire**, **el consumo de agua** y **la presión turística**.
 
-El sistema combina una API REST robusta (Django + DRF), una capa de tiempo real basada en WebSockets (Django Channels + Redis), tareas asíncronas de ingesta de datos (Celery) y un dashboard interactivo en React con mapas geoespaciales (Leaflet) y gráficos analíticos (Recharts).
+El sistema combina una API REST robusta (Django + DRF) documentada con **OpenAPI 3.0 / Swagger UI**, una capa de comunicación en tiempo real basada en WebSockets (Django Channels + Redis), tareas asíncronas ETL de ingesta de datos (Celery + Celery Beat) y una interfaz de usuario interactiva en React con diseño adaptativo (Tailwind CSS, Lucide Icons), mapas geoespaciales (Leaflet) y gráficos analíticos (Recharts).
 
-*Proyecto correspondiente al módulo formativo **IFCD0112 - POO y Bases de Datos Relacionales - Full Stack** (Hito 2).*
 
 ---
 
@@ -17,274 +16,315 @@ El sistema combina una API REST robusta (Django + DRF), una capa de tiempo real 
 
 ---
 
+## 📸 Capturas de Pantalla (Screenshots)
+
+
+### 🚀 Landing Page
+
+
+### 📊 Dashboard Analítico
+
+
+### 📑 Documentación Interactiva de la API (Swagger UI)
+
+
+---
+
+## 🛠️ Tecnologías Utilizadas
+
+### 🔹 Frontend
+* **Core:** React 18, Vite
+* **Estilos y Componentes UI:** Tailwind CSS, Lucide React Icons
+* **Navegación:** React Router DOM (v6)
+* **Visualización de Datos:** Recharts (gráficos de series temporales), Leaflet & React-Leaflet (mapas interactivos)
+* **Peticiones HTTP & Estado:** Axios, Context API (`AuthContext`)
+* **Testing:** Vitest, React Testing Library
+
+### 🔹 Backend
+* **Core Framework:** Python 3.11, Django 5
+* **API REST & Autenticación:** Django REST Framework (DRF), Simple JWT (Tokens JWT), `django-filter`
+* **Documentación OpenAPI:** `drf-spectacular` (Swagger UI & ReDoc)
+* **Tiempo Real:** Django Channels 4 (ASGI Server via Daphne)
+* **Tareas Asíncronas & Programadas:** Celery, Celery Beat
+* **Machine Learning & Análisis:** Scikit-Learn, Pandas, NumPy (Regresión Lineal, Z-Score para anomalías)
+* **Testing:** Pytest, Pytest-Django
+
+### 🔹 Base de Datos, Caché e Infraestructura
+* **Base de Datos Relacional:** PostgreSQL 15 (Almacenamiento persistente con restricciones avanzadas)
+* **Mensajería y Caché:** Redis 7 (Broker de Celery y Channel Layer para WebSockets)
+* **Orquestación:** Docker, Docker Compose
+
+---
+
 ## 1. Modelo de Datos y Arquitectura de Integridad
 
-El sistema implementa las relaciones y reglas de integridad solicitadas en el diseño de la base de datos:
+El sistema implementa las relaciones y reglas de integridad de base de datos relacional:
 
 * **Relación Uno a Uno (1:1):** 
-  * User <-> UserProfile mediante OneToOneField (creación automatizada vía post_save signal).
+  * `User` <-> `UserProfile` mediante `OneToOneField` (creación automatizada vía señal `post_save`).
 * **Relaciones Uno a Muchos (1:N):** 
-  * District -> WeatherRecord
-  * District -> WaterConsumption
-  * District -> WaterPrediction (Detección de anomalías con ML)
-  * District -> AirQuality
-  * District -> AirPrediction (Predicción analítica de NO2/PM10)
-  * District -> TourismPressure
-  * District -> IncidentReport
-  * District -> Alert (Persistencia de alertas para WebSockets)
-  * User -> IncidentReport
+  * `District` -> `WeatherRecord`
+  * `District` -> `WaterConsumption`
+  * `District` -> `WaterPrediction` (Detección de anomalías con ML)
+  * `District` -> `AirQuality`
+  * `District` -> `AirPrediction` (Predicción analítica de NO₂/PM10)
+  * `District` -> `TourismPressure`
+  * `District` -> `IncidentReport`
+  * `District` -> `Alert` (Persistencia de alertas para WebSockets)
+  * `User` -> `IncidentReport`
 * **Relación Muchos a Muchos (N:M):** 
-  * IncidentReport <-> Tag mediante ManyToManyField.
-* **Restricciones de Integridad Avanzadas (UniqueConstraint):**
-  * Uso de UniqueConstraint en Meta.constraints para evitar registros duplicados por distrito y fecha en tablas de series temporales (WeatherRecord, WaterConsumption, WaterPrediction, AirQuality, TourismPressure y Alert).
+  * `IncidentReport` <-> `Tag` mediante `ManyToManyField`.
+* **Restricciones de Integridad Avanzadas (`UniqueConstraint`):**
+  * Definición explícita en `Meta.constraints` para evitar duplicidad de series temporales por distrito y fecha (`WeatherRecord`, `WaterConsumption`, `WaterPrediction`, `AirQuality`, `TourismPressure` y `Alert`).
 
-> El Diagrama Entidad-Relación (DER) visual y normalizado se encuentra disponible en la ruta docs/DER_CityFlow.pdf.
-
----
-
-## 2. 🏗️ Arquitectura del Sistema
-
-El proyecto está construido con una arquitectura de microservicios orquestada con **Docker Compose**, permitiendo levantar todo el ecosistema con un solo comando. Los servicios son:
-
-* **Frontend:** React + Vite + Leaflet + Recharts (Puerto 5173).
-* **Backend:** Django + Django REST Framework + Daphne (ASGI) (Puerto 8000).
-* **Base de Datos:** PostgreSQL 15 (almacenamiento relacional persistente).
-* **Mensajería y Caché:** Redis 7 (Broker de Celery y Channel Layer para WebSockets).
-* **Worker y Beat:** Celery (Ejecución de tareas ETL en segundo plano: ingesta horaria de aire y diaria de turismo).
-* **APIs Externas:** Open Data BCN (Aire y HUTs), Àrea Metropolitana de Barcelona (Agua).
-
-### 🛠️ Tecnologías utilizadas
-| Capa | Tecnologías |
-| :--- | :--- |
-| **Frontend** | React, Vite, TailwindCSS, Leaflet, Recharts, Axios, React Router |
-| **Backend** | Django, Django REST Framework, Django Channels (ASGI), Simple JWT |
-| **Base de Datos** | PostgreSQL 15 |
-| **Mensajería / Tareas** | Redis 7, Celery 5, Celery Beat |
-| **Machine Learning** | Scikit-Learn, Pandas, Numpy (Z-Score, Regresión Lineal) |
-| **Infraestructura** | Docker, Docker Compose |
-| **Testing** | Pytest + Pytest-Django (Backend), Vitest + React Testing Library (Frontend) |
+> El Diagrama Entidad-Relación (DER) visual y normalizado se encuentra en `docs/DER_CityFlow.pdf`.
 
 ---
 
-## 3. Requisitos Previos
+## 🚀 2. Instalación y Puesta en Marcha
 
-* Docker Desktop (con WSL2 en Windows).
-* Node.js (v18 o superior) y npm.
-* Git.
+Se contemplan dos flujos de trabajo según el entorno deseado:
 
----
+### Opción A: Despliegue completo con Docker Compose (Recomendado)
 
-## 4. Instalación y Puesta en Marcha
+Levanta PostgreSQL, Redis, Django (Daphne), Celery Worker y Celery Beat en contenedores aislados.
 
-1. **Clonar el repositorio:**
+1. **Clonar el repositorio y configurar variables de entorno:**
+   ```bash
+   git clone https://github.com/City-Flow/CityFlow.git
+   cd CityFlow
+   ```
+   Crea un archivo `.env` en la raíz del proyecto:
+   ```env
+   SECRET_KEY=tu-clave-secreta-aqui
+   DATABASE_URL=postgres://cityflow_user:cityflow_pass@db:5432/cityflow_db
+   REDIS_URL=redis://redis:6379/0
+   DJANGO_ENV=dev
+   ```
 
-    git clone https://github.com/City-Flow/CityFlow.git
-    cd CityFlow
+2. **Levantar el ecosistema de contenedores:**
+   ```bash
+   docker compose up -d --build
+   ```
 
-2. **Crear el archivo .env en la raíz del proyecto** con las variables de entorno:
+3. **Ejecutar migraciones y sembrar la base de datos (ETL):**
+   ```bash
+   docker compose exec web python manage.py migrate
+   docker compose exec web python manage.py createsuperuser
+   docker compose exec web python manage.py seed_districts
+   docker compose exec web python manage.py ingest_air
+   docker compose exec web python manage.py ingest_water
+   docker compose exec web python manage.py ingest_tourism_history
+   ```
 
-    SECRET_KEY=tu-clave-secreta-aqui
-    DATABASE_URL=postgres://cityflow_user:cityflow_pass@db:5432/cityflow_db
-    REDIS_URL=redis://redis:6379/0
-    DJANGO_ENV=dev
-
-3. **Levantar el ecosistema Docker:**
-
-    docker compose up -d --build
-
-4. **Aplicar migraciones y crear el superusuario:**
-
-    docker compose exec web python manage.py migrate
-    docker compose exec web python manage.py createsuperuser
-
-5. **Sembrar los datos (Scripts ETL):**
-
-    # Crear los 10 distritos de Barcelona
-    docker compose exec web python manage.py seed_districts
-
-    # Cargar el histórico de calidad del aire (29 CSVs)
-    docker compose exec web python manage.py ingest_air
-
-    # Cargar la serie histórica de consumo de agua (AMB)
-    docker compose exec web python manage.py ingest_water
-
-    # Cargar el histórico de HUTs (API CKAN)
-    docker compose exec web python manage.py ingest_tourism_history
-
-6. **Arrancar el frontend:**
-
-    cd frontend
-    npm install
-    npm run dev
-
-### 🌐 URLs de acceso
-| Servicio | URL |
-| :--- | :--- |
-| **Dashboard Frontend** | http://localhost:5173 |
-| **API REST (Browsable)** | http://localhost:8000/api/ |
-| **Panel de Administración** | http://localhost:8000/admin/ |
-| **WebSocket de Alertas** | ws://localhost:8000/ws/alerts/ |
+4. **Arrancar el Frontend (en otra terminal):**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
 ---
 
-## 5. Endpoints Principales
+### Opción B: Desarrollo Local (Backend local + Frontend)
 
-| Recurso | Endpoint | Métodos Permitidos | Descripción |
+Ideal para desarrollo activo de la API, pruebas rápidas o integración con Swagger sin necesidad de levantar todo el stack de infraestructura.
+
+1. **Configurar el entorno virtual Python:**
+   ```bash
+   python -m venv .venv
+   # En Windows (PowerShell):
+   .venv\Scripts\Activate.ps1
+   # En macOS / Linux:
+   source .venv/bin/activate
+
+   pip install -r requirements.txt
+   ```
+
+2. **Aplicar migraciones y arrancar el servidor Django:**
+   ```bash
+   python manage.py migrate
+   python manage.py runserver
+   ```
+
+3. **Arrancar el Frontend:**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+---
+
+## 🌐 URLs de Acceso
+
+| Servicio / Vista | URL | Descripción |
+| :--- | :--- | :--- |
+| **Landing Page / Aplicación** | http://localhost:5173 | Interfaz principal en React |
+| **Swagger UI (Interactive API)** | http://localhost:8000/api/docs/ | Documentación interactiva de la API |
+| **OpenAPI Schema (JSON)** | http://localhost:8000/api/schema/ | Esquema formal OpenAPI 3.0 |
+| **API REST (DRF Browsable)** | http://localhost:8000/api/ | Navegador nativo de DRF |
+| **Panel de Administración** | http://localhost:8000/admin/ | Gestión de datos Django Admin |
+| **WebSocket de Alertas** | `ws://localhost:8000/ws/alerts/` | Canal en tiempo real para eventos |
+
+---
+
+## 📌 Endpoints Principales (API REST)
+
+Toda la especificación interactiva se encuentra disponible y ejecutable en **/api/docs/** (Swagger UI).
+
+| Recurso | Endpoint | Métodos | Descripción |
 | :--- | :--- | :--- | :--- |
-| **Usuarios** | /api/users/ | GET, POST, PUT, PATCH, DELETE | Gestión de usuarios y roles con contraseñas cifradas |
-| **Perfiles** | /api/profiles/ | GET, PUT, PATCH | Perfiles 1:1 asociados a los usuarios |
-| **Distritos** | /api/districts/ | GET, POST, PUT, PATCH, DELETE | Entidad maestra con coordenadas para mapas |
-| **Meteorología** | /api/weather/ | GET, POST, PUT, PATCH, DELETE | Registros climáticos históricos |
-| **Consumo de Agua** | /api/water-consumption/ | GET, POST, PUT, PATCH, DELETE | Mediciones de consumo hídrico (m3) |
-| **Predicción de Agua** | /api/water-predictions/ | GET, POST, PUT, PATCH, DELETE | Estimaciones y detección de anomalías |
-| **Calidad del Aire** | /api/air-quality/ | GET, POST, PUT, PATCH, DELETE | Mediciones de contaminantes (NO2 y PM10) |
-| **Predicción de Aire** | /api/air-predictions/ | GET, POST, PUT, PATCH, DELETE | Proyecciones y pronósticos de polución |
-| **Presión Turística** | /api/tourism-pressure/ | GET, POST, PUT, PATCH, DELETE | Viviendas de uso turístico (HUT) y ruido |
-| **Incidencias** | /api/incidents/ | GET, POST, PUT, PATCH, DELETE | Reportes ciudadanos y operativos |
-| **Etiquetas** | /api/tags/ | GET, POST, PUT, PATCH, DELETE | Categorización de incidencias |
-| **Alertas** | /api/alerts/ | GET, POST, PUT, PATCH, DELETE | Registro persistido de alertas |
+| **Usuarios** | `/api/users/` | GET, POST, PUT, PATCH, DELETE | Gestión de usuarios y asignación de roles |
+| **Perfiles** | `/api/profiles/` | GET, PUT, PATCH | Perfiles extendidos (1:1) asociados al usuario |
+| **Distritos** | `/api/districts/` | GET, POST, PUT, PATCH, DELETE | Entidad geográfica maestra con coordenadas lat/lng |
+| **Meteorología** | `/api/weather/` | GET, POST, PUT, PATCH, DELETE | Serie temporal de variables atmosféricas |
+| **Consumo Agua** | `/api/water-consumption/` | GET, POST, PUT, PATCH, DELETE | Mediciones históricas de consumo hídrico ($m^3$) |
+| **Predicción Agua** | `/api/water-predictions/` | GET, POST, PUT, PATCH, DELETE | Estimaciones y flags de anomalías nocturnas |
+| **Calidad Aire** | `/api/air-quality/` | GET, POST, PUT, PATCH, DELETE | Lecturas de NO₂ y PM10 con cálculo ICA |
+| **Predicción Aire** | `/api/air-predictions/` | GET, POST, PUT, PATCH, DELETE | Proyecciones analíticas de contaminación |
+| **Presión Turística** | `/api/tourism-pressure/` | GET, POST, PUT, PATCH, DELETE | Registro acumulado e incremental de HUTs |
+| **Incidencias** | `/api/incidents/` | GET, POST, PUT, PATCH, DELETE | Reportes operativos y ciudadanos |
+| **Etiquetas** | `/api/tags/` | GET, POST, PUT, PATCH, DELETE | Categorización N:M para incidencias |
+| **Alertas** | `/api/alerts/` | GET, POST, PUT, PATCH, DELETE | Registro persistido transmitido vía WebSockets |
 
 ---
 
-## 6. 📡 Módulos del Dashboard
+## 📡 3. Módulos y Pantallas del Sistema
 
-El frontend cuenta con cuatro pestañas principales, cada una con su lógica de negocio:
+### 🚀 Landing Page (`/`)
+* **Vista pública promocional e informativa.**
+* Presenta el panel en vivo "Estado de la Ciudad", módulos de resiliencia, arquitectura del pipeline de ingesta y llamada a la acción hacia la plataforma de monitoreo.
 
 ### 🌫️ Módulo de Calidad del Aire
-* **Fuente:** Open Data BCN (CSV horario).
-* **Datos:** +4.000 días de histórico, predicciones con Regresión Lineal e Índice de Calidad del Aire (ICA) según RD 102/2011.
-* **Tiempo Real:** Las alertas críticas se envían por WebSocket automáticamente.
-* **ETL:** Se actualiza cada hora mediante Celery Beat.
+* **Fuente:** Open Data BCN (archivos CSV horarios).
+* **Funcionalidad:** Evaluación del Índice de Calidad del Aire (ICA) bajo normativa RD 102/2011, predicciones con Regresión Lineal y envío de alertas por WebSocket al superar umbrales normativos.
 
 ### 💧 Módulo de Consumo de Agua
 * **Fuente:** Àrea Metropolitana de Barcelona (AMB).
-* **Datos:** Serie histórica 1994-2025 distribuida proporcionalmente por población en los 10 distritos.
-* **Análisis:** Gráfico de evolución anual y cálculo de varianza interanual.
+* **Funcionalidad:** Serie histórica (1994-2025) ponderada por densidad poblacional por distrito, gráficos de varianza interanual y detección de anomalías con algoritmos Z-Score.
 
 ### 🏛️ Módulo de Presión Turística
 * **Fuente:** API CKAN de Open Data BCN.
-* **Datos:** 10.707 HUTs registradas, extraídas y acumuladas por año desde 2012.
-* **Análisis:** Gráfico combinado (línea de total acumulado + barras de incremento anual).
-* **ETL:** Se actualiza cada 24 horas mediante Celery Beat.
-
-### 📊 Módulo Integrado (Próxima Iteración)
-* **Estado:** Simulación conceptual (Mockup).
-* **Visión:** Cruzar los datos de los tres módulos en un panel de riesgos unificado. Requiere entrenamiento de modelo ML ponderado.
+* **Funcionalidad:** Análisis de más de 10.700 Viviendas de Uso Turístico (HUTs), evolución desde 2012 e impacto por barrio.
 
 ---
 
-## 7. Búsqueda, Filtrado y Ordenación
+## 🔍 Búsqueda, Filtrado y Ordenación
 
-Paginación (por defecto a 10 resultados por página):
-
-    GET /api/water-consumption/?page=1
-
-Búsqueda de texto (SearchFilter):
-
-    GET /api/districts/?search=Eixample
-    GET /api/incidents/?search=fuga
-
-Filtrado avanzado (django-filter):
-
-    GET /api/water-consumption/?district=1&period_date=2026-08-01
-    GET /api/alerts/?severity=critical&status=unread
-
-Ordenación (OrderingFilter):
-
-    GET /api/water-consumption/?ordering=-consumption_m3
-    GET /api/alerts/?ordering=-created_at
-
----
-
-## 8. WebSockets en Tiempo Real
-
-CityFlow cuenta con un canal de eventos en vivo gestionado con Django Channels y Redis:
-
-* **Ruta de conexión:** ws://localhost:8000/ws/alerts/
-* **Grupo de transmisión:** alerts
-* **Disparador:** Las alertas creadas en la base de datos disparan una señal (post_save) que difunde el evento a todos los clientes conectados.
-
-**Ejemplo de Payload JSON:**
-
-    {
-      "type": "air_quality.created",
-      "alert_id": 4,
-      "district_id": 1,
-      "district_name": "Ciutat Vella",
-      "severity": "critical",
-      "title": "Anomalía crítica detectada",
-      "message": "Los niveles de NO2 superaron el límite legal permitido.",
-      "created_at": "2026-11-15T15:30:00Z"
-    }
+* **Paginación:** Respuestas paginadas por defecto (10 elementos/página):
+  ```http
+  GET /api/water-consumption/?page=1
+  ```
+* **Búsqueda por texto (`SearchFilter`):**
+  ```http
+  GET /api/districts/?search=Eixample
+  GET /api/incidents/?search=fuga
+  ```
+* **Filtrado Avanzado (`django-filter`):**
+  ```http
+  GET /api/water-consumption/?district=1&period_date=2026-08-01
+  GET /api/alerts/?severity=critical&status=unread
+  ```
+* **Ordenación (`OrderingFilter`):**
+  ```http
+  GET /api/water-consumption/?ordering=-consumption_m3
+  GET /api/alerts/?ordering=-created_at
+  ```
 
 ---
 
-## 9. 🧪 Ejecución de Tests Automáticos
+## ⚡ WebSockets en Tiempo Real
 
-El proyecto cuenta con una suite de pruebas profesional para garantizar la calidad y estabilidad del código.
+CityFlow transmite alertas en tiempo real mediante **Django Channels** y la capa de canales en **Redis**:
+
+* **Ruta de conexión:** `ws://localhost:8000/ws/alerts/`
+* **Grupo en vivo:** `alerts`
+* **Mecanismo:** La creación de registros en la tabla `Alert` dispara una señal (`post_save`) que difunde el payload JSON a todos los clientes WebSocket conectados.
+
+---
+
+## 🧪 Tests Automáticos
 
 ### Backend (Pytest)
+```bash
+docker compose exec web pytest -v
+# o localmente:
+pytest -v
+```
+* **16 pruebas unitarias e integrales** que verifican los modelos, serializers, vistas REST, autenticación JWT, algoritmos de detección de anomalías y señales WebSocket.
 
-    docker compose exec web pytest -v
-
-* **16 tests** que cubren modelos, API REST, autenticación JWT, lógica de ML (anomalías de agua), tareas ETL y la señal de WebSockets.
-
-### Frontend (Vitest + React Testing Library)
-
-    cd frontend
-    npm test
-
-* **9 tests** que cubren el renderizado de los gráficos, componentes de autenticación y la pestaña de Turismo.
-
----
-
-## 10. 📂 Estructura del Proyecto
-
-    CityFlow/
-    ├── config/                     # Configuración del proyecto Django
-    │   ├── settings/               # Configuración dividida por entorno
-    │   │   ├── base.py             # Configuración común
-    │   │   ├── dev.py              # Entorno de desarrollo
-    │   │   └── prod.py             # Entorno de producción
-    │   ├── asgi.py                 # Servidor ASGI (WebSockets)
-    │   ├── celery.py               # Programación de tareas Celery
-    │   ├── urls.py                 # URLs raíz
-    │   └── wsgi.py
-    ├── cityFlow/                   # App principal
-    │   ├── management/commands/    # Scripts ETL (ingest_air, sync_tourism_live, etc.)
-    │   ├── migrations/
-    │   ├── services/               # Lógica de ML y despachador de alertas
-    │   ├── tests/                  # Suite de tests Backend
-    │   ├── consumers.py            # Consumidor WebSocket
-    │   ├── models.py               # Modelos relacionales
-    │   ├── signals.py              # Emisión de alertas a Redis
-    │   ├── tasks.py                # Tareas asíncronas
-    │   └── views.py                # ViewSets de DRF
-    ├── frontend/                   # Aplicación React
-    │   ├── src/
-    │   │   ├── components/         # Componentes (AirChart, MapView, TourismTab, etc.)
-    │   │   ├── context/            # Autenticación JWT
-    │   │   ├── pages/              # Vistas de Login y Registro
-    │   │   ├── services/           # Cliente Axios
-    │   │   └── tests/              # Suite de tests Frontend
-    │   ├── vitest.config.js
-    │   └── package.json
-    ├── docker-compose.yml          # Orquestación de microservicios
-    ├── Dockerfile                  # Imagen Docker del Backend
-    ├── requirements.txt            # Dependencias de Python
-    ├── pytest.ini                  # Configuración de Pytest
-    └── README.md
+### Frontend (Vitest)
+```bash
+cd frontend
+npm test
+```
+* **9 pruebas integradas** que validan el renderizado de gráficos, componentes del dashboard, autenticación y la vista de turismo.
 
 ---
 
-## 11. 📄 Licencia
+## 📂 Estructura del Proyecto
 
-Este proyecto está bajo la Licencia **MIT**. Consulta el archivo LICENSE para más detalles.
+```
+CityFlow/
+├── cityFlow/                   # Aplicación principal Django
+│   ├── data/                   # Archivos de datos de entrenamiento/semilla
+│   ├── management/             # Comandos ETL (seed_districts, ingest_air, ingest_water, etc.)
+│   ├── migrations/             # Migraciones de base de datos PostgreSQL
+│   ├── services/               # Lógica de Machine Learning y despachador de alertas
+│   ├── tests/                  # Suite de pruebas unitarias (Pytest)
+│   ├── admin.py                # Configuración de Django Admin
+│   ├── apps.py                 # Configuración del app cityFlow
+│   ├── consumers.py            # Consumidor de WebSockets (Django Channels)
+│   ├── models.py               # Modelos relacionales con reglas de integridad
+│   ├── routing.py              # Enrutamiento de WebSockets
+│   ├── serializers.py          # Serializadores DRF
+│   ├── signals.py              # Eventos y emisión de alertas a Redis
+│   ├── tasks.py                # Tareas asíncronas de Celery
+│   ├── urls.py                 # URLs internas de la app
+│   └── views.py                # ViewSets de DRF
+├── config/                     # Configuración global del proyecto Django
+│   ├── settings/               # Ajustes por entorno (base.py, dev.py, prod.py)
+│   ├── asgi.py                 # Punto de entrada ASGI (WebSockets & HTTP)
+│   ├── celery.py               # Configuración de Celery & Celery Beat
+│   ├── urls.py                 # Rutas raíz (incluye drf-spectacular Swagger)
+│   └── wsgi.py                 # Punto de entrada WSGI
+├── frontend/                   # Aplicación cliente React
+│   ├── src/
+│   │   ├── assets/             # Recursos estáticos e imágenes
+│   │   ├── components/         # Componentes UI reutilizables (Navbar, MapView, AirChart, etc.)
+│   │   ├── context/            # Proveedor de estado global (AuthContext)
+│   │   ├── pages/              # Páginas de la aplicación (LandingPage, LoginPage, RegisterPage, etc.)
+│   │   ├── services/           # Configuración de Axios para llamadas a la API
+│   │   ├── tests/              # Pruebas de componentes React (Vitest)
+│   │   ├── views/              # Vistas principales del Dashboard
+│   │   ├── App.css             # Estilos globales
+│   │   ├── App.jsx             # Componente raíz con enrutamiento de React Router
+│   │   ├── index.css           # Configuración de Tailwind CSS
+│   │   ├── main.jsx            # Punto de entrada de React DOM
+│   │   └── setupTests.jsx      # Configuración de entorno de tests
+│   ├── package.json
+│   └── vitest.config.js
+├── .env                        # Archivo de variables de entorno (no comiteado)
+├── .gitignore
+├── docker-compose.yml          # Orquestación de servicios (web, db, redis, celery)
+├── Dockerfile                  # Construcción del contenedor Backend
+├── manage.py                   # Gestor de comandos de Django
+├── pytest.ini                  # Configuración de Pytest
+├── README.md                   # Documentación principal del proyecto
+└── requirements.txt            # Lista de dependencias de Python (incluye drf-spectacular)
+```
+
+---
+
+## 📄 Licencia
+
+Este proyecto está distribuido bajo la licencia **MIT**. Consulta el archivo `LICENSE` para más información.
 
 ---
 
 ## 🙏 Agradecimientos
 
-* **Open Data BCN** por proporcionar los datos abiertos de calidad del aire y HUTs.
-* **Àrea Metropolitana de Barcelona (AMB)** por los datos históricos de consumo de agua.
-* **IFCD0112** por el marco formativo y el apoyo durante el desarrollo.
+* **Open Data BCN** por proveer las fuentes de datos abiertos de calidad del aire y viviendas de uso turístico (HUTs).
+* **Àrea Metropolitana de Barcelona (AMB)** por los registros históricos de consumo hídrico.
+* **IFCD0112** por la guía académica e instrumental durante el desarrollo del proyecto final.
