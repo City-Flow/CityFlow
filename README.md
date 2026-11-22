@@ -1,3 +1,4 @@
+<img width="1878" height="939" alt="Screenshot 2026-11-21 134238" src="https://github.com/user-attachments/assets/7c31534f-7e58-49a9-843a-6ac9f11d7444" />
 # 🌆 CityFlow — Monitor Urbano de Resiliencia (Barcelona)
 
 **CityFlow** es una plataforma Full Stack de análisis de resiliencia urbana para la ciudad de Barcelona. Su objetivo es monitorizar, predecir y alertar sobre el estado de tres ejes fundamentales para la sostenibilidad de la ciudad: **la calidad del aire**, **el consumo de agua** y **la presión turística**.
@@ -19,15 +20,18 @@ El sistema combina una API REST robusta (Django + DRF) documentada con **OpenAPI
 ## 📸 Capturas de Pantalla (Screenshots)
 
 
-### 🚀 Landing Page
+### 🚀 Landing Page `"/"`
 
 
-### 📊 Dashboard Analítico
+<img width="1878" height="939" alt="Screenshot 2026-11-21 134238" src="https://github.com/user-attachments/assets/416675e3-bf29-4cf2-b48a-398b8a088f98" />
 
 
-### 📑 Documentación Interactiva de la API (Swagger UI)
+### 📊 Dashboard Analítico `/dashboard`
 
 
+### 📑 Documentación Interactiva de la API (Swagger UI) `localhost:8000/api/docs/`
+
+<img width="719" height="957" alt="Screenshot 2026-11-21 224015" src="https://github.com/user-attachments/assets/7714e885-7ab0-467d-8965-3350ae000a19" />
 ---
 
 ## 🛠️ Tecnologías Utilizadas
