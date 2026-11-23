@@ -27,6 +27,7 @@ El sistema combina una API REST robusta (Django + DRF) documentada con **OpenAPI
 
 ### 📊 Dashboard Analítico `/dashboard`
 
+<img width="1320" height="802" alt="Screenshot 2026-11-08 232630" src="https://github.com/user-attachments/assets/1f035086-4328-40d4-9406-20b1d033bda0" />
 
 ### 📑 Documentación Interactiva de la API (Swagger UI) `localhost:8000/api/docs/`
 
